@@ -1,0 +1,8 @@
+Redis:
+  Addr: 127.0.0.1
+  PassWord: ""
+  DB: 6379
+ElasticSearch:
+  Url: http://localhost:9200
+  Username: ""
+  Password: ""

@@ -4,6 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+
+	"webssh-go/config"
+	"webssh-go/pkg/logger"
+
+	"webssh-gp/pkg/logger"
 
 	"github.com/olivere/elastic/v7"
 )
@@ -12,13 +18,15 @@ var ElasticSearch *elastic.Client
 
 func Init() {
 	client, err := elastic.NewClient(
-		elastic.SetURL(""),
-		elastic.SetBasicAuth("", ""), // 用户名和密码
+		elastic.SetURL(config.Conf.ElasticSearch.Url),
+		elastic.SetBasicAuth(config.Conf.ElasticSearch.Username, config.Conf.ElasticSearch.Password), // 用户名和密码
 	)
 	if err != nil {
+		logger.Error(fmt.Sprintf("es连接失败-%s",err.Error()))
 		return
 	}
 	ElasticSearch = client
+	logger.Info(fmt.Sprintf("es连接成功"))
 }
 
 // CreateIndex
