@@ -7,6 +7,10 @@ import (
 )
  
 type Config struct {
+	Server struct {
+		Ip string `json:"ip" comment:"服务地址"`
+		Port int `json:"port" comment:"服务端口"`	
+	}
 	Redis struct {
 		Addr string `json:"add" comment:"redis主机地址"`
 		Password string `json:"password" commnet:"redis密码"`

@@ -1,3 +1,6 @@
+Server:
+  Ip: 0.0.0.0
+  Port: 8080
 Redis:
   Addr: 127.0.0.1
   PassWord: ""

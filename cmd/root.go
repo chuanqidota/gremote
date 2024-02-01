@@ -10,6 +10,11 @@ import (
 	"webssh-go/pkg/es"
 	"webssh-go/pkg/logger"
 	"webssh-go/pkg/redis"
+	"webssh-go/router"
+
+	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -34,4 +39,19 @@ func init() {
 	logger.Init()
 	redis.Init()
 	es.Init()
+}
+
+func Run() {
+
+	addr := fmt.Sprintf("%s:%d", config.Conf.Server.Ip, config.Conf.Server.Port)
+	server := &http.Server{
+		Addr:           addr,
+		Handler:        router.Engine(),
+		ReadTimeout:    60 * time.Second,
+		WriteTimeout:   60 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+	if err := server.ListenAndServe(); err != nil {
+		fmt.Println(err.Error())
+	}
 }
