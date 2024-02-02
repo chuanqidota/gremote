@@ -7,7 +7,7 @@ import (
 	"webssh-go/config"
 	"webssh-go/pkg/logger"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 var RedisClient *redis.Client
@@ -31,3 +31,4 @@ func Init() {
 	}
 	logger.Info(fmt.Sprintf("redis连接成功信息：%v", client))
 }
+

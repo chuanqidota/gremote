@@ -26,5 +26,6 @@ func (a *apiHandle) ObtainKey(c *gin.Context) {
 	_uuid := uuid.New().String()
 	uuid_ := strings.Replace(_uuid, "-", "", -1)
 	fmt.Sprintln(uuid_)
+	
 	return
 }

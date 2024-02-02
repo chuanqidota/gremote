@@ -24,7 +24,9 @@ var rootCmd = &cobra.Command{
 	Use:   "webssh-go",
 	Short: "go版本的webssh",
 	Long:  "go版本的webssh",
-	Run:   func(cmd *cobra.Command, args []string) {},
+	Run:   func(cmd *cobra.Command, args []string) {
+		Run()
+	},
 }
 
 func Execute() {
@@ -42,7 +44,6 @@ func init() {
 }
 
 func Run() {
-
 	addr := fmt.Sprintf("%s:%d", config.Conf.Server.Ip, config.Conf.Server.Port)
 	server := &http.Server{
 		Addr:           addr,
