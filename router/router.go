@@ -1,16 +1,22 @@
 package router
 
 import (
-	"webssh-go/app/ws/view"
+	ws_view "webssh-go/app/ws/view"
+	api_view "webssh-go/app/api/view"
 
 	"github.com/gin-gonic/gin"
 )
 
 func Engine() *gin.Engine {
 	router := gin.Default()
-	v1 := router.Group("v1")
+	ws := router.Group("ws")
 	{
-		v1.GET("ws/:key", view.WsHandle.Handler)
+		ws.GET("v1/:key", ws_view.WsHandle.Handler)
+	}
+
+	api := router.Group("api")
+	{
+		api.POST("v1/obtain-key",api_view.ApiHandle.ObtainKey) // 获取key
 	}
 
 	return router

@@ -9,7 +9,6 @@ import (
 	"webssh-go/config"
 	"webssh-go/pkg/logger"
 
-	"webssh-gp/pkg/logger"
 
 	"github.com/olivere/elastic/v7"
 )
