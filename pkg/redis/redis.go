@@ -33,6 +33,7 @@ func Init() {
 	logger.Info(fmt.Sprintf("redis连接成功信息：%v", client))
 }
 
+// Set 设置指定键
 func Set(key string, value any, expiration time.Duration) error {
 	value_, err := json.Marshal(value)
 	if err != nil {
@@ -45,6 +46,7 @@ func Set(key string, value any, expiration time.Duration) error {
 	}
 }
 
+// Get 获取值 value 是传入的值
 func Get(key string, value any) error {
 	result, err := RedisClient.Get(context.Background(), key).Bytes()
 	if err != nil {
@@ -53,8 +55,8 @@ func Get(key string, value any) error {
 	return json.Unmarshal(result, value)
 }
 
+// DeleteKey 删除指定的键
 func DeleteKey(key string) error {
-	// 删除指定的键
 	err := RedisClient.Del(context.Background(), key).Err()
 	if err != nil {
 		logger.Error(fmt.Sprintf("删除键：%s", err.Error()))
