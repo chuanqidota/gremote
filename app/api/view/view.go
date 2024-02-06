@@ -41,7 +41,7 @@ func (a *apiHandle) ObtainKey(c *gin.Context) {
 func (a *apiHandle) ListFile(c *gin.Context) {
 	// 获取key和path信息
 	var listFileBody params.ListFileBody
-	if err := c.ShouldBindQuery(&listFileBody); err != nil {
+	if err := c.ShouldBindJSON(&listFileBody); err != nil {
 		response.Fail(c, fmt.Sprintf("传入参数错误-%s", err.Error()))
 		return
 	}
@@ -92,5 +92,25 @@ func (a *apiHandle) UploadFile(c *gin.Context) {
 
 // DownLoadFile 下载文件
 func (a *apiHandle) DownLoadFile(c *gin.Context) {
+	// 获取key和path信息
+	var downLoadFileBody params.DownLoadFileBody
+	if err := c.ShouldBindQuery(&downLoadFileBody); err != nil {
+		response.Fail(c, fmt.Sprintf("传入参数错误-%s", err.Error()))
+		return
+	}
 
+	// 通过key->target/username/password/port
+	var itemInfo params.ItemInfo
+	if err := redis.Get(downLoadFileBody.Key, &itemInfo); err != nil {
+		response.Fail(c, fmt.Sprintf("没有登录信息-%s", err.Error()))
+		return
+	}
+
+	filename := downLoadFileBody.FileName
+	res, err := file.FileHandle.DownLoadFile(itemInfo, downLoadFileBody.Path, downLoadFileBody.FileName)
+	if err != nil {
+		response.Fail(c, fmt.Sprintf("执行失败-%s", err.Error()))
+		return
+	}
+	response.File(c, filename, res)
 }

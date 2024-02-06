@@ -10,6 +10,8 @@ import (
 	"mime/multipart"
 	"path/filepath"
 
+	"bytes"
+
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
@@ -19,6 +21,7 @@ type fileHandle struct {
 
 var FileHandle = new(fileHandle)
 
+// ListFile 查看文件列表
 func (f *fileHandle) ListFile(itemInfo params.ItemInfo, path string) ([]map[string]any, error) {
 	// 使用切片嵌套的map来存储目录和文件的大小和名称
 	result := make([]map[string]interface{}, 0)
@@ -82,6 +85,7 @@ func (f *fileHandle) ListFile(itemInfo params.ItemInfo, path string) ([]map[stri
 
 }
 
+// UploadFile 上传文件
 func (f *fileHandle) UploadFile(file *multipart.FileHeader, itemInfo params.ItemInfo, path string) error {
 	// 初始化登录信息
 	target := itemInfo.Target
@@ -138,4 +142,57 @@ func (f *fileHandle) UploadFile(file *multipart.FileHeader, itemInfo params.Item
 		return err
 	}
 	return nil
+}
+
+// DownLoadFile 下载文件
+func (f *fileHandle) DownLoadFile(itemInfo params.ItemInfo, path string, filename string) ([]byte, error) {
+	target := itemInfo.Target
+	username := itemInfo.Username
+	password := itemInfo.Password
+	port := itemInfo.Port
+
+	sshConfig := &ssh.ClientConfig{
+		User: username,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(password),
+			// 或者使用SSH密钥：ssh.PublicKeys(privateKey),
+		},
+		// 可以添加其他配置项，如HostKeyCallback等
+	}
+
+	// 建立SSH连接
+	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", target, port), sshConfig)
+	if err != nil {
+		logger.Error(fmt.Sprintf("建立ssh连接失败-%s", err.Error()))
+		return nil, err
+	}
+	defer client.Close()
+
+	// 使用SFTP连接
+	sftpClient, err := sftp.NewClient(client)
+	if err != nil {
+		logger.Error(fmt.Sprintf("sftp客户端连接失败-%s", err.Error()))
+		return nil, err
+	}
+	defer sftpClient.Close()
+
+	// 指定远程文件路径
+	remoteFilePath := filepath.Join(path, filename)
+	// 打开远程文件以读取
+	remoteFile, err := sftpClient.Open(remoteFilePath)
+	if err != nil {
+		logger.Error(fmt.Sprintf("读取远程文件失败-%s", err.Error()))
+		return nil, err
+	}
+	defer remoteFile.Close()
+
+	// 将远程文件内容直接写入HTTP响应
+	buffer := new(bytes.Buffer)
+	_, err = io.Copy(buffer, remoteFile)
+	if err != nil {
+		logger.Error(fmt.Sprintf("写入http文件失败-%s", err.Error()))
+		return nil, err
+	}
+	return buffer.Bytes(), nil
+
 }

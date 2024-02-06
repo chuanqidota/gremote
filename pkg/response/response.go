@@ -1,8 +1,10 @@
 package response
 
 import (
-	"github.com/gin-gonic/gin"
+	"fmt"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 func Success(c *gin.Context, msg string, data any) {
@@ -19,4 +21,11 @@ func Fail(c *gin.Context, msg string) {
 		"code": 0,
 		"data": nil,
 	})
+}
+
+// File 文件响应
+func File(c *gin.Context, filename string, res []byte) {
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	c.Data(http.StatusOK, "application/octet-stream", res)
+
 }
