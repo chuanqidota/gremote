@@ -9,6 +9,8 @@ import (
 	"strings"
 	"webssh-go/pkg/redis"
 
+	"webssh-go/pkg/file"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -35,27 +37,57 @@ func (a *apiHandle) ObtainKey(c *gin.Context) {
 	response.Success(c, "执行成功", map[string]string{"result": key})
 }
 
-// 目标目录下的文件
+// ListFile 列出目录下的文件-大小-类型
 func (a *apiHandle) ListFile(c *gin.Context) {
+	// 获取key和path信息
 	var listFileBody params.ListFileBody
-	if err := c.ShouldBindJSON(&listFileBody); err != nil {
+	if err := c.ShouldBindQuery(&listFileBody); err != nil {
 		response.Fail(c, fmt.Sprintf("传入参数错误-%s", err.Error()))
 		return
 	}
-	var itemInfo params.ItemInfo
 
+	// 通过key->target/username/password/port
+	var itemInfo params.ItemInfo
 	if err := redis.Get(listFileBody.Key, &itemInfo); err != nil {
-		response.Fail(c,fmt.Sprintf("没有登录信息-%s",err.Error()))
+		response.Fail(c, fmt.Sprintf("没有登录信息-%s", err.Error()))
 		return
 	}
 
-
+	result, err := file.FileHandle.ListFile(itemInfo, listFileBody.Path)
+	if err != nil {
+		response.Fail(c, err.Error())
+		return
+	}
+	response.Success(c, "执行成功", result)
 
 }
 
 // UploadFile 上传文件
 func (a *apiHandle) UploadFile(c *gin.Context) {
+	fileObj, err := c.FormFile("file")
+	if err != nil {
+		response.Fail(c, fmt.Sprintf("上传文件失败-%s", err.Error()))
+		return
+	}
 
+	var uploadFileBody params.UploadFileBody
+	if err := c.ShouldBindJSON(&uploadFileBody); err != nil {
+		response.Fail(c, fmt.Sprintf("参数错误-%s", err.Error()))
+		return
+	}
+
+	// 通过key->target/username/password/port
+	var itemInfo params.ItemInfo
+	if err := redis.Get(uploadFileBody.Key, &itemInfo); err != nil {
+		response.Fail(c, fmt.Sprintf("没有登录信息-%s", err.Error()))
+		return
+	}
+
+	if err := file.FileHandle.UploadFile(fileObj, itemInfo, uploadFileBody.Path); err != nil {
+		response.Fail(c, fmt.Sprintf("上传文件失败-%s", err.Error()))
+		return
+	}
+	response.Success(c, "执行成功", nil)
 }
 
 // DownLoadFile 下载文件
