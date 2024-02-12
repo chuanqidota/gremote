@@ -18,8 +18,8 @@ type ListFileBody struct {
 
 // UploadFileBody 上传文件参数
 type UploadFileBody struct {
-	Key  string `json:"key" comment:"redis中的key" binding:"required"`
-	Path string `json:"path" comment:"目标服务器上的路径" binding:"required"`
+	Key  string `form:"key" comment:"redis中的key" binding:"required"`
+	Path string `form:"path" comment:"目标服务器上的路径" binding:"required"`
 }
 
 // DownLoadFileBody 下载文件参数

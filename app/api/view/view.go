@@ -71,7 +71,7 @@ func (a *apiHandle) UploadFile(c *gin.Context) {
 	}
 
 	var uploadFileBody params.UploadFileBody
-	if err := c.ShouldBindJSON(&uploadFileBody); err != nil {
+	if err := c.ShouldBindQuery(&uploadFileBody); err != nil {
 		response.Fail(c, fmt.Sprintf("参数错误-%s", err.Error()))
 		return
 	}
