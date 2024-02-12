@@ -22,15 +22,15 @@ type fileHandle struct {
 var FileHandle = new(fileHandle)
 
 // ListFile 查看文件列表
-func (f *fileHandle) ListFile(itemInfo params.ItemInfo, path string) ([]map[string]any, error) {
+func (f *fileHandle) ListFile(info params.Info, path string) ([]map[string]any, error) {
 	// 使用切片嵌套的map来存储目录和文件的大小和名称
 	result := make([]map[string]interface{}, 0)
 
 	// 初始化登录信息
-	target := itemInfo.Target
-	username := itemInfo.Username
-	password := itemInfo.Password
-	port := itemInfo.Port
+	target := info.Target
+	username := info.Username
+	password := info.Password
+	port := info.Port
 
 	sshConfig := &ssh.ClientConfig{
 		User: username,
@@ -86,12 +86,12 @@ func (f *fileHandle) ListFile(itemInfo params.ItemInfo, path string) ([]map[stri
 }
 
 // UploadFile 上传文件
-func (f *fileHandle) UploadFile(file *multipart.FileHeader, itemInfo params.ItemInfo, path string) error {
+func (f *fileHandle) UploadFile(file *multipart.FileHeader, info params.Info, path string) error {
 	// 初始化登录信息
-	target := itemInfo.Target
-	username := itemInfo.Username
-	password := itemInfo.Password
-	port := itemInfo.Port
+	target := info.Target
+	username := info.Username
+	password := info.Password
+	port := info.Port
 
 	sshConfig := &ssh.ClientConfig{
 		User: username,
@@ -145,11 +145,11 @@ func (f *fileHandle) UploadFile(file *multipart.FileHeader, itemInfo params.Item
 }
 
 // DownLoadFile 下载文件
-func (f *fileHandle) DownLoadFile(itemInfo params.ItemInfo, path string, filename string) ([]byte, error) {
-	target := itemInfo.Target
-	username := itemInfo.Username
-	password := itemInfo.Password
-	port := itemInfo.Port
+func (f *fileHandle) DownLoadFile(info params.Info, path string, filename string) ([]byte, error) {
+	target := info.Target
+	username := info.Username
+	password := info.Password
+	port := info.Port
 
 	sshConfig := &ssh.ClientConfig{
 		User: username,

@@ -30,7 +30,7 @@ func (a *apiHandle) ObtainKey(c *gin.Context) {
 	_uuid := uuid.New().String()
 	key := strings.Replace(_uuid, "-", "", -1)
 
-	if err := redis.Set(key, info, time.Second*60); err != nil {
+	if err := redis.Set(key, info, time.Second*600); err != nil {
 		response.Fail(c, fmt.Sprintf("redis设置失败-%s", err.Error()))
 		return
 	}
@@ -41,19 +41,19 @@ func (a *apiHandle) ObtainKey(c *gin.Context) {
 func (a *apiHandle) ListFile(c *gin.Context) {
 	// 获取key和path信息
 	var listFileBody params.ListFileBody
-	if err := c.ShouldBindJSON(&listFileBody); err != nil {
+	if err := c.ShouldBindQuery(&listFileBody); err != nil {
 		response.Fail(c, fmt.Sprintf("传入参数错误-%s", err.Error()))
 		return
 	}
 
 	// 通过key->target/username/password/port
-	var itemInfo params.ItemInfo
-	if err := redis.Get(listFileBody.Key, &itemInfo); err != nil {
+	var info params.Info
+	if err := redis.Get(listFileBody.Key, &info); err != nil {
 		response.Fail(c, fmt.Sprintf("没有登录信息-%s", err.Error()))
 		return
 	}
-
-	result, err := file.FileHandle.ListFile(itemInfo, listFileBody.Path)
+	fmt.Println(info)
+	result, err := file.FileHandle.ListFile(info, listFileBody.Path)
 	if err != nil {
 		response.Fail(c, err.Error())
 		return
@@ -77,13 +77,13 @@ func (a *apiHandle) UploadFile(c *gin.Context) {
 	}
 
 	// 通过key->target/username/password/port
-	var itemInfo params.ItemInfo
-	if err := redis.Get(uploadFileBody.Key, &itemInfo); err != nil {
+	var info params.Info
+	if err := redis.Get(uploadFileBody.Key, &info); err != nil {
 		response.Fail(c, fmt.Sprintf("没有登录信息-%s", err.Error()))
 		return
 	}
 
-	if err := file.FileHandle.UploadFile(fileObj, itemInfo, uploadFileBody.Path); err != nil {
+	if err := file.FileHandle.UploadFile(fileObj, info, uploadFileBody.Path); err != nil {
 		response.Fail(c, fmt.Sprintf("上传文件失败-%s", err.Error()))
 		return
 	}
@@ -100,14 +100,14 @@ func (a *apiHandle) DownLoadFile(c *gin.Context) {
 	}
 
 	// 通过key->target/username/password/port
-	var itemInfo params.ItemInfo
-	if err := redis.Get(downLoadFileBody.Key, &itemInfo); err != nil {
+	var info params.Info
+	if err := redis.Get(downLoadFileBody.Key, &info); err != nil {
 		response.Fail(c, fmt.Sprintf("没有登录信息-%s", err.Error()))
 		return
 	}
 
 	filename := downLoadFileBody.FileName
-	res, err := file.FileHandle.DownLoadFile(itemInfo, downLoadFileBody.Path, downLoadFileBody.FileName)
+	res, err := file.FileHandle.DownLoadFile(info, downLoadFileBody.Path, downLoadFileBody.FileName)
 	if err != nil {
 		response.Fail(c, fmt.Sprintf("执行失败-%s", err.Error()))
 		return
