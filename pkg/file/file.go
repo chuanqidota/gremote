@@ -38,7 +38,7 @@ func (f *fileHandle) ListFile(info params.Info, path string) ([]map[string]any, 
 			ssh.Password(password),
 			// 或者使用SSH密钥：ssh.PublicKeys(privateKey),
 		},
-		// 可以添加其他配置项，如HostKeyCallback等
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
 	// 建立SSH连接
@@ -99,6 +99,7 @@ func (f *fileHandle) UploadFile(file *multipart.FileHeader, info params.Info, pa
 			ssh.Password(password),
 			// 或者使用SSH密钥：ssh.PublicKeys(privateKey),
 		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		// 可以添加其他配置项，如HostKeyCallback等
 	}
 
@@ -157,6 +158,7 @@ func (f *fileHandle) DownLoadFile(info params.Info, path string, filename string
 			ssh.Password(password),
 			// 或者使用SSH密钥：ssh.PublicKeys(privateKey),
 		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		// 可以添加其他配置项，如HostKeyCallback等
 	}
 
