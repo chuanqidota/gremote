@@ -13,7 +13,7 @@ import (
 	"bytes"
 
 	"github.com/pkg/sftp"
-	"golang.org/x/crypto/ssh"
+	"webssh-go/pkg/sshClient"
 )
 
 type fileHandle struct {
@@ -32,17 +32,7 @@ func (f *fileHandle) ListFile(info params.Info, path string) ([]map[string]any, 
 	password := info.Password
 	port := info.Port
 
-	sshConfig := &ssh.ClientConfig{
-		User: username,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(password),
-			// 或者使用SSH密钥：ssh.PublicKeys(privateKey),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
-
-	// 建立SSH连接
-	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", target, port), sshConfig)
+	client, err := sshClient.Client(username, password, target, port)
 	if err != nil {
 		logger.Error(fmt.Sprintf("建立ssh连接失败-%s", err.Error()))
 		return result, err
@@ -93,18 +83,7 @@ func (f *fileHandle) UploadFile(file *multipart.FileHeader, info params.Info, pa
 	password := info.Password
 	port := info.Port
 
-	sshConfig := &ssh.ClientConfig{
-		User: username,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(password),
-			// 或者使用SSH密钥：ssh.PublicKeys(privateKey),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		// 可以添加其他配置项，如HostKeyCallback等
-	}
-
-	// 建立SSH连接
-	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", target, port), sshConfig)
+	client, err := sshClient.Client(username, password, target, port)
 	if err != nil {
 		logger.Error(fmt.Sprintf("建立ssh连接失败-%s", err.Error()))
 		return err
@@ -152,21 +131,10 @@ func (f *fileHandle) DownLoadFile(info params.Info, path string, filename string
 	password := info.Password
 	port := info.Port
 
-	sshConfig := &ssh.ClientConfig{
-		User: username,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(password),
-			// 或者使用SSH密钥：ssh.PublicKeys(privateKey),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		// 可以添加其他配置项，如HostKeyCallback等
-	}
-
-	// 建立SSH连接
-	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", target, port), sshConfig)
+	client, err := sshClient.Client(username, password, target, port)
 	if err != nil {
 		logger.Error(fmt.Sprintf("建立ssh连接失败-%s", err.Error()))
-		return nil, err
+		return []byte{}, err
 	}
 	defer client.Close()
 
