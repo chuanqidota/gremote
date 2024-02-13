@@ -6,6 +6,9 @@ Redis:
   PassWord: ""
   DB: 0
 ElasticSearch:
-  Url: http://localhost:9200
+  Url: http://127.0.0.1:9200
   Username: ""
   Password: ""
+Audit:
+  LoginAuditIndex: webssh-login
+  RecordAuditIndex: webssh-record

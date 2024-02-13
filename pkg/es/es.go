@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
 	"webssh-go/config"
 	"webssh-go/pkg/logger"
-
 
 	"github.com/olivere/elastic/v7"
 )
@@ -21,7 +19,7 @@ func Init() {
 		elastic.SetBasicAuth(config.Conf.ElasticSearch.Username, config.Conf.ElasticSearch.Password), // 用户名和密码
 	)
 	if err != nil {
-		logger.Error(fmt.Sprintf("es连接失败-%s",err.Error()))
+		logger.Error(fmt.Sprintf("es连接失败-%s", err.Error()))
 		return
 	}
 	ElasticSearch = client
@@ -169,5 +167,36 @@ func Search(index string, query string) (result []map[string]any, count int64) {
 		return result, searchResult.Hits.TotalHits.Value
 	} else {
 		return nil, 0
+	}
+}
+
+func UpdateByField(index, byField, ByValue, ChField, ChValue string) {
+	// 构建查询条件
+	termQuery := elastic.NewTermQuery(byField, ByValue)
+	// 执行查询
+	searchResult, err := ElasticSearch.Search().
+		Index(index).
+		Query(termQuery).
+		Do(context.Background())
+	if err != nil {
+		logger.Error(fmt.Sprintf("查询出错-%s", err.Error()))
+		return
+	}
+	for _, hit := range searchResult.Hits.Hits {
+		// 提取文档 ID
+		docID := hit.Id
+
+		// 创建更新请求
+		updateRequest := elastic.NewBulkUpdateRequest().
+			Index(index).
+			Id(docID).
+			Doc(map[string]interface{}{ChField: ChValue})
+
+		// 将更新请求添加到批量操作中
+		_, err := ElasticSearch.Bulk().Add(updateRequest).Do(context.Background())
+		if err != nil {
+			// 处理错误
+			logger.Error(fmt.Sprintf("更新出错-%s", err.Error()))
+		}
 	}
 }

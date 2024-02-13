@@ -64,3 +64,17 @@ func DeleteKey(key string) error {
 	}
 	return nil
 }
+
+// Exist 判断key存不存在
+func Exist(key string) bool {
+	exists, err := RedisClient.Exists(context.Background(), key).Result()
+	if err != nil {
+		logger.Error(fmt.Sprintf("获取redis中的key错误-%s", err.Error()))
+		return false
+	}
+	if exists == 0 {
+		return false
+	} else {
+		return true
+	}
+}

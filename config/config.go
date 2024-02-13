@@ -1,25 +1,29 @@
 package config
 
 import (
+	"fmt"
 	"github.com/spf13/viper"
 	"webssh-go/pkg/logger"
-	"fmt"
 )
- 
+
 type Config struct {
 	Server struct {
-		Ip string `json:"ip" comment:"服务地址"`
-		Port int `json:"port" comment:"服务端口"`	
+		Ip   string `json:"ip" comment:"服务地址"`
+		Port int    `json:"port" comment:"服务端口"`
 	}
 	Redis struct {
-		Addr string `json:"add" comment:"redis主机地址"`
+		Addr     string `json:"add" comment:"redis主机地址"`
 		Password string `json:"password" commnet:"redis密码"`
-		DB int `json:"db" comment:"redis数据库编号"`
+		DB       int    `json:"db" comment:"redis数据库编号"`
 	}
 	ElasticSearch struct {
-		Url string `json:"url" comment:"es地址"`
+		Url      string `json:"url" comment:"es地址"`
 		Username string `json:"username" comment:"es用户名"`
 		Password string `json:"password" comment:"es密码"`
+	}
+	Audit struct {
+		LoginAuditIndex  string `json:"login_audit" comment:"登录审计-es索引"`
+		RecordAuditIndex string `json:"record_audit" comment:"操作审计-es索引"`
 	}
 }
 
