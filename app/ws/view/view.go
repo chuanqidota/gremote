@@ -1,6 +1,8 @@
 package view
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"net/http"
@@ -8,6 +10,7 @@ import (
 	"webssh-go/app/api/params"
 	"webssh-go/app/ws/utils/loginAudit"
 	"webssh-go/pkg/redis"
+	"webssh-go/pkg/sshClient"
 )
 
 type wsHandle struct {
@@ -23,7 +26,6 @@ var upgrader = websocket.Upgrader{
 }
 
 func (w wsHandle) Handler(c *gin.Context) {
-
 	// 升级http为ws
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -64,6 +66,29 @@ func (w wsHandle) Handler(c *gin.Context) {
 	e.WriteData(data)
 	defer e.UpdateEndTime(key)
 
+	// ssh客户端
+	client, err := sshClient.Client(info.Username, info.Password, info.Target, info.Port)
+	if err != nil {
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("远程服务器连接失败"))
+		return
+	}
+	// 接受终端大小 {"resize":[1,2]}
+	_, firstMessage, _ := conn.ReadMessage()
+	var firstData map[string][]int
+	err = json.Unmarshal(firstMessage, &firstData)
+	if err != nil {
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("接收窗口大小失败"))
+		return
+	}
+	cols := firstData["resize"][0]
+	rows := firstData["resize"][1]
+	session, err := sshClient.Session(client, cols, rows)
+	if err != nil {
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("远程服务器建立session失败"))
+		return
+	}
+	fmt.Println(session)
+
 	// 监听 ws 消息
 	for {
 		// 从 ws 读取数据
@@ -71,11 +96,14 @@ func (w wsHandle) Handler(c *gin.Context) {
 		if err != nil {
 			break
 		}
+		// 发送消息到远程服务器
+		res, _ := sshClient.Write(session, string(message))
 		//往 ws 写数据
-		err = conn.WriteMessage(mt, message)
+		fmt.Println("res---", string(res))
+
+		err = conn.WriteMessage(mt, res)
 		if err != nil {
 			break
 		}
 	}
-
 }
