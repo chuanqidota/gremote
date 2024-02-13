@@ -170,6 +170,7 @@ func Search(index string, query string) (result []map[string]any, count int64) {
 	}
 }
 
+// UpdateByField 根据字段进行更新
 func UpdateByField(index, byField, ByValue, ChField, ChValue string) {
 	// 构建查询条件
 	termQuery := elastic.NewTermQuery(byField, ByValue)

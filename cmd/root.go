@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"os"
+	"webssh-go/pkg/as3"
 
 	"webssh-go/config"
 	"webssh-go/pkg/es"
@@ -24,7 +25,7 @@ var rootCmd = &cobra.Command{
 	Use:   "webssh-go",
 	Short: "go版本的webssh",
 	Long:  "go版本的webssh",
-	Run:   func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, args []string) {
 		Run()
 	},
 }
@@ -41,6 +42,7 @@ func init() {
 	logger.Init()
 	redis.Init()
 	es.Init()
+	as3.Init()
 }
 
 func Run() {

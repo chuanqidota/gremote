@@ -25,6 +25,13 @@ type Config struct {
 		LoginAuditIndex  string `json:"login_audit" comment:"登录审计-es索引"`
 		RecordAuditIndex string `json:"record_audit" comment:"操作审计-es索引"`
 	}
+	As3 struct {
+		EndPoint        string `json:"endpoint" comment:"地址"`
+		AccessKeyID     string `json:"accessKeyID" comment:"密钥ID"`
+		SecretAccessKey string `json:"secretAccessKey" comment:"密钥KEY"`
+		UseSSL          bool   `json:"useSSL" comment:"是否使用SSL"`
+		Bucket          string `json:"bucket" comment:"桶名字"`
+	}
 }
 
 var Conf = new(Config)
