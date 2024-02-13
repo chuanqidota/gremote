@@ -31,24 +31,25 @@ func (w wsHandle) Handler(c *gin.Context) {
 	}
 	defer conn.Close()
 
-	// 链接处理
+	// 没有找到key>无效
 	key := c.Param("key")
 	if key == "" {
 		_ = conn.WriteMessage(websocket.TextMessage, []byte("无效链接"))
 		return
 	}
-
+	// redis中不存在>属于第二次登录
 	if !redis.Exist(key) {
 		_ = conn.WriteMessage(websocket.TextMessage, []byte("链接失效"))
 		return
 	}
-
+	// 通过key获取redis中>用户信息
 	var info params.Info
 	err = redis.Get(key, &info)
 	if err != nil {
 		_ = conn.WriteMessage(websocket.TextMessage, []byte("获取登录信息失败"))
 		return
 	}
+	// 获取成功以后删除redis中的key
 	_ = redis.DeleteKey(key)
 
 	// 登录信息写入到es中

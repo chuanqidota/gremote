@@ -13,7 +13,7 @@ Audit:
   LoginAuditIndex: webssh-login
   RecordAuditIndex: webssh-record
 As3:
-  EndPoint: 127.0.0.1
+  EndPoint: 127.0.0.1:9000
   AccessKeyID: ""
   SecretAccessKey: ""
   UseSSL: true

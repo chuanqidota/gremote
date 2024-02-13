@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 	"webssh-go/app/api/params"
+	"webssh-go/config"
 	"webssh-go/pkg/response"
 
 	"strings"
@@ -130,4 +131,17 @@ func (a *apiHandle) LoginAudit(c *gin.Context) {
 		"count":  count,
 	}
 	response.Success(c, "执行成功", result)
+}
+
+// RecordUrl 获取 记录的url
+func (a *apiHandle) RecordUrl(c *gin.Context) {
+	key := c.Query("key")
+	if key == "" {
+		response.Fail(c, "参数错误")
+		return
+	}
+	endpoint := config.Conf.As3.EndPoint
+	bucket := config.Conf.As3.Bucket
+	url := fmt.Sprintf("http://%s/%s/%s", endpoint, bucket, key)
+	response.Success(c, "执行成功", url)
 }
