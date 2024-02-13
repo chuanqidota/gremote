@@ -28,3 +28,14 @@ type DownLoadFileBody struct {
 	Path     string `form:"path" comment:"目录地址" binding:"required"`
 	FileName string `form:"filename" comment:"文件名" binding:"required"`
 }
+
+type LoginAuditQuery struct {
+	Offset    int    `form:"offset" comment:"分页-offset"`
+	Limit     int    `form:"limit" comment:"分页-limit"`
+	User      string `form:"user" comment:"用户信息"`
+	Source    string `form:"source" comment:"源地址"`
+	Target    string `form:"target" comment:"目的地址"`
+	StartTime string `form:"startTime" comment:"开始时间"`
+	EndTime   string `form:"endTime" comment:"结束时间"`
+	Search    string `form:"search" comment:"搜索"`
+}

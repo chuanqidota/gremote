@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+	"webssh-go/app/api/params"
 	"webssh-go/config"
 	"webssh-go/pkg/es"
 	"webssh-go/pkg/logger"
@@ -64,41 +65,43 @@ func (e *EsAudit) WriteData(data map[string]any) {
 }
 
 func (e *EsAudit) UpdateEndTime(keyValue string) {
-	es.UpdateByField(e.Index, "key", keyValue, "endTime", time.Now().Format("2006-01-02 15:03:04"))
+	es.UpdateByField(e.Index, "key", keyValue, "endTime", time.Now().Format("2006-01-02 15:04:05"))
 }
 
 // ReadData 读取数据
-func (e *EsAudit) ReadData(data map[string]string, from int, size int) ([]map[string]any, int64) {
-	user, userOk := data["user"]
-	source, sourceOk := data["source"]
-	target, targetOk := data["target"]
-	startTime, startTimeOk := data["startTime"]
-	endTime, endTimeOk := data["endTime"]
-	search, searchOk := data["search"]
+func (e *EsAudit) ReadData(data params.LoginAuditQuery) ([]map[string]any, int64) {
+	user := data.User
+	source := data.Source
+	target := data.Target
+	startTime := data.StartTime
+	endTime := data.EndTime
+	search := data.Search
+	limit := data.Limit
+	offset := data.Offset
 
 	var must []map[string]any
-	if userOk && user != "" {
+	if user != "" {
 		must = append(must, map[string]any{
 			"wildcard": map[string]string{
 				"user": fmt.Sprintf("*%s*", user),
 			},
 		})
 	}
-	if sourceOk && source != "" {
+	if source != "" {
 		must = append(must, map[string]any{
 			"wildcard": map[string]string{
 				"source": fmt.Sprintf("*%s*", source),
 			},
 		})
 	}
-	if targetOk && target != "" {
+	if target != "" {
 		must = append(must, map[string]any{
 			"wildcard": map[string]string{
 				"target": fmt.Sprintf("*%s*", target),
 			},
 		})
 	}
-	if startTimeOk && endTimeOk && startTime != "" && endTime != "" {
+	if startTime != "" && endTime != "" {
 		must = append(must, map[string]any{
 			"range": map[string]any{
 				"timestamp": map[string]string{
@@ -110,7 +113,7 @@ func (e *EsAudit) ReadData(data map[string]string, from int, size int) ([]map[st
 	}
 
 	var should []map[string]any
-	if searchOk && search != "" {
+	if search != "" {
 		should = append(should, map[string]any{
 			"wildcard": map[string]string{
 				"user": fmt.Sprintf("*%s*", search),
@@ -126,11 +129,11 @@ func (e *EsAudit) ReadData(data map[string]string, from int, size int) ([]map[st
 		})
 	}
 
-	if from == 0 {
-		from = 0
+	if offset == 0 {
+		offset = 0
 	}
-	if size == 0 {
-		size = 10
+	if limit == 0 {
+		limit = 10
 	}
 
 	query := map[string]any{
@@ -140,8 +143,8 @@ func (e *EsAudit) ReadData(data map[string]string, from int, size int) ([]map[st
 				"should": should,
 			},
 		},
-		"from": from,
-		"size": size,
+		"from": offset,
+		"size": limit,
 	}
 	queryB, ok := json.Marshal(query)
 	if ok != nil {

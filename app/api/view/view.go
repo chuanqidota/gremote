@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"webssh-go/app/ws/utils/loginAudit"
 )
 
 type apiHandle struct {
@@ -113,4 +114,20 @@ func (a *apiHandle) DownLoadFile(c *gin.Context) {
 		return
 	}
 	response.File(c, filename, res)
+}
+
+// LoginAudit 登录审计查询
+func (a *apiHandle) LoginAudit(c *gin.Context) {
+	var data params.LoginAuditQuery
+	if err := c.ShouldBindQuery(&data); err != nil {
+		response.Fail(c, fmt.Sprintf("传参出错-%s", err.Error()))
+		return
+	}
+	e := loginAudit.NewEsAudit()
+	res, count := e.ReadData(data)
+	result := map[string]any{
+		"result": res,
+		"count":  count,
+	}
+	response.Success(c, "执行成功", result)
 }

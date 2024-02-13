@@ -20,6 +20,7 @@ func Engine() *gin.Engine {
 		api.GET("v1/list-file", api_view.ApiHandle.ListFile)         // 列出目标服务器上的文件
 		api.POST("v1/upload-file", api_view.ApiHandle.UploadFile)    // 上传文件到目标服务器
 		api.GET("v1/download-file", api_view.ApiHandle.DownLoadFile) // 从目标文件下载文件
+		api.GET("v1/login-audit", api_view.ApiHandle.LoginAudit)     // 登录审计
 	}
 
 	return router
