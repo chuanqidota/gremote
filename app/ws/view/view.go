@@ -9,6 +9,7 @@ import (
 	"time"
 	"webssh-go/app/api/params"
 	"webssh-go/app/ws/utils/loginAudit"
+	"webssh-go/pkg/logger"
 	"webssh-go/pkg/redis"
 	"webssh-go/pkg/sshClient"
 )
@@ -72,6 +73,8 @@ func (w wsHandle) Handler(c *gin.Context) {
 		_ = conn.WriteMessage(websocket.TextMessage, []byte("远程服务器连接失败"))
 		return
 	}
+	logger.Info("websocket连接成功-等待终端发送消息")
+
 	// 接受终端大小 {"resize":[1,2]}
 	_, firstMessage, _ := conn.ReadMessage()
 	var firstData map[string][]int
@@ -87,20 +90,23 @@ func (w wsHandle) Handler(c *gin.Context) {
 		_ = conn.WriteMessage(websocket.TextMessage, []byte("远程服务器建立session失败"))
 		return
 	}
-	fmt.Println(session)
+	logger.Info("设置行高-成功")
+	defer session.Close()
 
 	// 监听 ws 消息
 	for {
 		// 从 ws 读取数据
+		fmt.Println("ws-等待数据")
+
 		mt, message, err := conn.ReadMessage()
 		if err != nil {
 			break
 		}
+		fmt.Printf("ws-输入数据并发送到服务器-%s", string(message))
 		// 发送消息到远程服务器
 		res, _ := sshClient.Write(session, string(message))
 		//往 ws 写数据
-		fmt.Println("res---", string(res))
-
+		fmt.Println("ws-远程服务器响应数据并返回", string(res))
 		err = conn.WriteMessage(mt, res)
 		if err != nil {
 			break

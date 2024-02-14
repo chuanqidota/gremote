@@ -1,8 +1,11 @@
 package sshClient
 
 import (
+	"bytes"
 	"fmt"
 	"golang.org/x/crypto/ssh"
+	"log"
+	"sync"
 	"time"
 	"webssh-go/pkg/logger"
 )
@@ -26,6 +29,19 @@ func Client(username, password, target string, port int) (*ssh.Client, error) {
 	return client, nil
 }
 
+// wsBufferWriter 缓存
+type wsBufferWriter struct {
+	buffer bytes.Buffer
+	mu     sync.Mutex
+}
+
+// Write 实现Writer接口
+func (w *wsBufferWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buffer.Write(p)
+}
+
 // Session session会话
 func Session(client *ssh.Client, cols, rows int) (*ssh.Session, error) {
 	session, err := client.NewSession()
@@ -33,14 +49,22 @@ func Session(client *ssh.Client, cols, rows int) (*ssh.Session, error) {
 		logger.Error(fmt.Sprintf("创建session失败-%s", err.Error()))
 		return nil, err
 	}
+	// 用wsBufferWriter接受缓存
+	comboWriter := new(wsBufferWriter)
+	session.Stdout = comboWriter
+	session.Stderr = comboWriter
+	// 终端模式
 	modes := ssh.TerminalModes{
-		ssh.ECHO:          1,     // disable echo
-		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
+		ssh.ECHO:          1,     //  禁用回显（0禁用，1启动）
+		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud  传输速率
 		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
 	}
 	if err = session.RequestPty("xterm", rows, cols, modes); err != nil {
 		logger.Error(fmt.Sprintf("重新定义窗口大小失败-%s", err.Error()))
 		return nil, err
+	}
+	if err = session.Shell(); err != nil {
+		log.Fatalf("start shell error: %s", err.Error())
 	}
 	return session, nil
 }
