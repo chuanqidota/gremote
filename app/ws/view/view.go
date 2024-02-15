@@ -2,7 +2,6 @@ package view
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"net/http"
@@ -73,7 +72,15 @@ func (w wsHandle) Handler(c *gin.Context) {
 		_ = conn.WriteMessage(websocket.TextMessage, []byte("远程服务器连接失败"))
 		return
 	}
+	defer client.Close()
 	logger.Info("websocket连接成功-等待终端发送消息")
+
+	session, err := sshClient.Session(client)
+	if err != nil {
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("创建session会话失败"))
+		return
+	}
+	defer session.Close()
 
 	// 接受终端大小 {"resize":[1,2]}
 	_, firstMessage, _ := conn.ReadMessage()
@@ -85,31 +92,15 @@ func (w wsHandle) Handler(c *gin.Context) {
 	}
 	cols := firstData["resize"][0]
 	rows := firstData["resize"][1]
-	session, err := sshClient.Session(client, cols, rows)
+	err = sshClient.Resize(session, cols, rows)
 	if err != nil {
-		_ = conn.WriteMessage(websocket.TextMessage, []byte("远程服务器建立session失败"))
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("调整窗口大小失败"))
 		return
 	}
 	logger.Info("设置行高-成功")
-	defer session.Close()
 
-	// 监听 ws 消息
-	for {
-		// 从 ws 读取数据
-		fmt.Println("ws-等待数据")
-
-		mt, message, err := conn.ReadMessage()
-		if err != nil {
-			break
-		}
-		fmt.Printf("ws-输入数据并发送到服务器-%s", string(message))
-		// 发送消息到远程服务器
-		res, _ := sshClient.Write(session, string(message))
-		//往 ws 写数据
-		fmt.Println("ws-远程服务器响应数据并返回", string(res))
-		err = conn.WriteMessage(mt, res)
-		if err != nil {
-			break
-		}
+	err = sshClient.Terminal(session, &sshClient.StdOutErr{Conn: conn}, &sshClient.StdOutErr{Conn: conn}, &sshClient.StdIn{Conn: conn}, cols, rows)
+	if err != nil {
+		return
 	}
 }

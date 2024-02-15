@@ -1,11 +1,12 @@
 package sshClient
 
 import (
-	"bytes"
+	"encoding/json"
 	"fmt"
+	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/ssh"
-	"log"
-	"sync"
+	"io"
+	"os"
 	"time"
 	"webssh-go/pkg/logger"
 )
@@ -19,6 +20,11 @@ func Client(username, password, target string, port int) (*ssh.Client, error) {
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         30 * time.Second,
+		Config: ssh.Config{
+			// 默认加密方式 aes128-ctr aes192-ctr aes256-ctr aes128-gcm@openssh.com arcfour256 arcfour128
+			// 连 linux 通常没有问题，但是很多交换机其实默认只提供 aes128-cbc 3des-cbc aes192-cbc aes256-cbc 这些。
+			Ciphers: []string{"aes128-ctr", "aes192-ctr", "aes256-ctr", "aes128-gcm@openssh.com", "arcfour256", "arcfour128", "aes128-cbc", "3des-cbc", "aes192-cbc", "aes256-cbc"},
+		},
 	}
 	// 建立SSH连接
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", target, port), sshConfig)
@@ -26,55 +32,93 @@ func Client(username, password, target string, port int) (*ssh.Client, error) {
 		logger.Error(fmt.Sprintf("建立ssh连接失败-%s", err.Error()))
 		return nil, err
 	}
+
 	return client, nil
 }
 
-// wsBufferWriter 缓存
-type wsBufferWriter struct {
-	buffer bytes.Buffer
-	mu     sync.Mutex
-}
-
-// Write 实现Writer接口
-func (w *wsBufferWriter) Write(p []byte) (int, error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.buffer.Write(p)
-}
-
 // Session session会话
-func Session(client *ssh.Client, cols, rows int) (*ssh.Session, error) {
+func Session(client *ssh.Client) (*ssh.Session, error) {
 	session, err := client.NewSession()
 	if err != nil {
 		logger.Error(fmt.Sprintf("创建session失败-%s", err.Error()))
 		return nil, err
 	}
-	// 用wsBufferWriter接受缓存
-	comboWriter := new(wsBufferWriter)
-	session.Stdout = comboWriter
-	session.Stderr = comboWriter
-	// 终端模式
+	return session, nil
+}
+
+// Resize 重新定义窗口大小
+func Resize(session *ssh.Session, cols, rows int) error {
+	if err := session.WindowChange(cols, rows); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Terminal 启动一个终端
+func Terminal(session *ssh.Session, stdout, stderr io.Writer, stdin io.Reader, cols, rows int) error {
+	session.Stdout = io.MultiWriter(os.Stdout, stdout)
+	session.Stderr = io.MultiWriter(os.Stderr, stderr)
+	session.Stdin = stdin
 	modes := ssh.TerminalModes{
 		ssh.ECHO:          1,     //  禁用回显（0禁用，1启动）
 		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud  传输速率
 		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
 	}
-	if err = session.RequestPty("xterm", rows, cols, modes); err != nil {
-		logger.Error(fmt.Sprintf("重新定义窗口大小失败-%s", err.Error()))
-		return nil, err
+	if err := session.RequestPty("xterm", cols, rows, modes); err != nil {
+		return err
 	}
-	if err = session.Shell(); err != nil {
-		log.Fatalf("start shell error: %s", err.Error())
+	if err := session.Shell(); err != nil {
+		logger.Error(fmt.Sprintf("启动shell失败呢-%s", err.Error()))
 	}
-	return session, nil
+	if err := session.Wait(); err != nil {
+		logger.Error(fmt.Sprintf("session响应失败-%s", err.Error()))
+	}
+	return nil
 }
 
-// Write 方法用于从远程服务器读取响应
-func Write(session *ssh.Session, cmd string) ([]byte, error) {
-	output, err := session.CombinedOutput(cmd)
+// StdOutErr 定义标准输出和标准错误输出
+type StdOutErr struct {
+	Conn *websocket.Conn
+}
+
+// Write 实现io.Writer这个接口-往websocket中写入消息
+func (s *StdOutErr) Write(p []byte) (n int, err error) {
+	err = s.Conn.WriteMessage(websocket.TextMessage, p)
+	return len(p), err
+}
+
+// StdIn 定义标准输入
+type StdIn struct {
+	Conn    *websocket.Conn
+	Session *ssh.Session
+}
+
+// Read 实现io.Reader接口，从websocket中读取消息
+func (s *StdIn) Read(p []byte) (n int, err error) {
+	_, message, err := s.Conn.ReadMessage()
 	if err != nil {
-		logger.Error(fmt.Sprintf("读取远程服务器响应失败-%s", err.Error()))
-		return nil, err
+		return 0, err
 	}
-	return output, nil
+
+	var data map[string]any
+	err = json.Unmarshal(message, &data)
+	if err != nil {
+		return 0, err
+	}
+	resize, resizeOk := data["resize"]
+	if resizeOk {
+		resize, _ := resize.([]int)
+		cols := resize[0]
+		rows := resize[1]
+		if err = Resize(s.Session, cols, rows); err != nil {
+			return 0, err
+		}
+	}
+	text, textOk := data["data"]
+	if textOk {
+		text, _ := text.(string)
+		n = copy(p, []byte(fmt.Sprintf("%s\n", text)))
+		return n, err
+	}
+	return 0, err
 }
