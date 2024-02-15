@@ -117,7 +117,7 @@ func (s *StdIn) Read(p []byte) (n int, err error) {
 	text, textOk := data["data"]
 	if textOk {
 		text, _ := text.(string)
-		n = copy(p, []byte(fmt.Sprintf("%s\n", text)))
+		n = copy(p, []byte(fmt.Sprintf("%s", text)))
 		return n, err
 	}
 	return 0, err
