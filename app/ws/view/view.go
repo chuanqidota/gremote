@@ -10,7 +10,7 @@ import (
 	"webssh-go/app/ws/utils/loginAudit"
 	"webssh-go/pkg/logger"
 	"webssh-go/pkg/redis"
-	"webssh-go/pkg/sshClient"
+	"webssh-go/pkg/terminal"
 )
 
 type wsHandle struct {
@@ -78,7 +78,7 @@ func (w wsHandle) Handler(c *gin.Context) {
 	rows := firstData["resize"][1]
 
 	// ssh客户端
-	client, err := sshClient.Client(info.Username, info.Password, info.Target, info.Port)
+	client, err := terminal.Client(info.Username, info.Password, info.Target, info.Port)
 	if err != nil {
 		_ = conn.WriteMessage(websocket.TextMessage, []byte("远程服务器连接失败-用户密码不对"))
 		return
@@ -86,19 +86,19 @@ func (w wsHandle) Handler(c *gin.Context) {
 	defer client.Close()
 
 	// 初始化终端
-	terminal, err := sshClient.NewTerminal(client, cols, rows)
+	t, err := terminal.NewTerminal(client, cols, rows)
 	if err != nil {
 		_ = conn.WriteMessage(websocket.TextMessage, []byte("远程服务器连接失败-终端初始化失败"))
 		return
 	}
-	defer terminal.Close()
+	defer t.Close()
 	logger.Info("websocket连接成功-等待终端发送消息")
 
 	// 接受消息
 	quitChan := make(chan bool, 3)
-	go terminal.ReceiveWsMsg(conn, quitChan) // ws > terminal
-	go terminal.WriteWsMsg(conn, quitChan)   // terminal > ws
-	go terminal.SessionWait(quitChan)        // 关闭session
+	go t.ReceiveWsMsg(conn, quitChan) // ws > terminal
+	go t.WriteWsMsg(conn, quitChan)   // terminal > ws
+	go t.SessionWait(quitChan)        // 关闭session
 	<-quitChan
 
 }

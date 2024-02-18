@@ -13,7 +13,7 @@ import (
 	"bytes"
 
 	"github.com/pkg/sftp"
-	"webssh-go/pkg/sshClient"
+	"webssh-go/pkg/terminal"
 )
 
 type fileHandle struct {
@@ -32,7 +32,7 @@ func (f *fileHandle) ListFile(info params.Info, path string) ([]map[string]any, 
 	password := info.Password
 	port := info.Port
 
-	client, err := sshClient.Client(username, password, target, port)
+	client, err := terminal.Client(username, password, target, port)
 	if err != nil {
 		logger.Error(fmt.Sprintf("建立ssh连接失败-%s", err.Error()))
 		return result, err
@@ -83,7 +83,7 @@ func (f *fileHandle) UploadFile(file *multipart.FileHeader, info params.Info, pa
 	password := info.Password
 	port := info.Port
 
-	client, err := sshClient.Client(username, password, target, port)
+	client, err := terminal.Client(username, password, target, port)
 	if err != nil {
 		logger.Error(fmt.Sprintf("建立ssh连接失败-%s", err.Error()))
 		return err
@@ -131,7 +131,7 @@ func (f *fileHandle) DownLoadFile(info params.Info, path string, filename string
 	password := info.Password
 	port := info.Port
 
-	client, err := sshClient.Client(username, password, target, port)
+	client, err := terminal.Client(username, password, target, port)
 	if err != nil {
 		logger.Error(fmt.Sprintf("建立ssh连接失败-%s", err.Error()))
 		return []byte{}, err

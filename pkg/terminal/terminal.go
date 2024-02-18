@@ -1,4 +1,4 @@
-package sshClient
+package terminal
 
 import (
 	"bytes"
@@ -107,12 +107,14 @@ func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool) {
 		// 接受ws消息
 		_, message, err := ws.ReadMessage()
 		if err != nil {
+			_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("读取信息出错-%s", err.Error())))
 			return
 		}
 		// 解析ws消息
 		var data map[string]any
 		err = json.Unmarshal(message, &data)
 		if err != nil {
+			_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("发送的信息格式出错-%s", err.Error())))
 			return
 		}
 		resize, resizeOk := data["resize"]
@@ -120,7 +122,11 @@ func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool) {
 			resize_, _ := resize.([]any)
 			cols, _ := resize_[0].(int)
 			rows, _ := resize_[1].(int)
-			_ = t.Session.WindowChange(cols, rows)
+			err = t.Session.WindowChange(cols, rows)
+			if err != nil {
+				_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("调整窗口大小出错-%s", err.Error())))
+				return
+			}
 		}
 		text, textOk := data["data"]
 		if textOk {
@@ -140,7 +146,7 @@ func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool) {
 	defer setQuit(quitChan)
 	for {
 		if t.ComboOutput.buffer.Len() != 0 {
-			//fmt.Println("输出-", string(out.Bytes()))
+			//fmt.Println("输出-", string(t.ComboOutput.buffer.Bytes()))
 			_ = ws.WriteMessage(websocket.TextMessage, t.ComboOutput.buffer.Bytes())
 			t.ComboOutput.buffer.Reset()
 		}
