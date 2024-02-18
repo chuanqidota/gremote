@@ -66,23 +66,7 @@ func (w wsHandle) Handler(c *gin.Context) {
 	e.WriteData(data)
 	defer e.UpdateEndTime(key)
 
-	// ssh客户端
-	client, err := sshClient.Client(info.Username, info.Password, info.Target, info.Port)
-	if err != nil {
-		_ = conn.WriteMessage(websocket.TextMessage, []byte("远程服务器连接失败"))
-		return
-	}
-	defer client.Close()
-	logger.Info("websocket连接成功-等待终端发送消息")
-
-	session, err := sshClient.Session(client)
-	if err != nil {
-		_ = conn.WriteMessage(websocket.TextMessage, []byte("创建session会话失败"))
-		return
-	}
-	defer session.Close()
-
-	// 接受终端大小 {"resize":[1,2]}
+	// 接受第一次消息
 	_, firstMessage, _ := conn.ReadMessage()
 	var firstData map[string][]int
 	err = json.Unmarshal(firstMessage, &firstData)
@@ -92,15 +76,29 @@ func (w wsHandle) Handler(c *gin.Context) {
 	}
 	cols := firstData["resize"][0]
 	rows := firstData["resize"][1]
-	err = sshClient.Resize(session, cols, rows)
-	if err != nil {
-		_ = conn.WriteMessage(websocket.TextMessage, []byte("调整窗口大小失败"))
-		return
-	}
-	logger.Info("设置行高-成功")
 
-	err = sshClient.Terminal(session, &sshClient.StdOutErr{Conn: conn}, &sshClient.StdOutErr{Conn: conn}, &sshClient.StdIn{Conn: conn}, cols, rows)
+	// ssh客户端
+	client, err := sshClient.Client(info.Username, info.Password, info.Target, info.Port)
 	if err != nil {
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("远程服务器连接失败-用户密码不对"))
 		return
 	}
+	defer client.Close()
+
+	// 初始化终端
+	terminal, err := sshClient.NewTerminal(client, cols, rows)
+	if err != nil {
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("远程服务器连接失败-终端初始化失败"))
+		return
+	}
+	defer terminal.Close()
+	logger.Info("websocket连接成功-等待终端发送消息")
+
+	// 接受消息
+	quitChan := make(chan bool, 3)
+	go terminal.ReceiveWsMsg(conn, quitChan) // ws > terminal
+	go terminal.WriteWsMsg(conn, quitChan)   // terminal > ws
+	go terminal.SessionWait(quitChan)        // 关闭session
+	<-quitChan
+
 }
