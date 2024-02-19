@@ -1,9 +1,11 @@
 package view
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 	"webssh-go/app/api/params"
+	"webssh-go/app/ws/utils/recordAudit"
 	"webssh-go/config"
 	"webssh-go/pkg/response"
 
@@ -142,6 +144,18 @@ func (a *apiHandle) RecordUrl(c *gin.Context) {
 	}
 	endpoint := config.Conf.As3.EndPoint
 	bucket := config.Conf.As3.Bucket
+
+	record := recordAudit.NewEsRecord()
+	result := record.ReadData(key)
+	var data []any
+	for _, value := range result {
+		history, _ := value["history"].(string)
+		var v any
+		_ = json.Unmarshal([]byte(history), &v)
+		data = append(data, v)
+	}
+	fmt.Println(data)
+
 	url := fmt.Sprintf("http://%s/%s/%s", endpoint, bucket, key)
-	response.Success(c, "执行成功", url)
+	response.Success(c, "执行成功", map[string]any{"url": url, "data": data})
 }

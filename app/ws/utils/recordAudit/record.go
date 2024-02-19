@@ -56,23 +56,40 @@ func (e *EsRecord) WriteData(data map[string]any) {
 func (e *EsRecord) ReadData(key string) []map[string]any {
 	result := make([]map[string]any, 0)
 	index := e.Index
-	query := `{
-		"query":{
-			"bool":{
-				"must":[
-					{
-						"match":{
-							"key": %s
-						}
-					}
-				]
-			}
+	pageNum := 1
+	pageSize := 10000
+	for {
+		from := (pageNum - 1) * pageSize
+		query := `{
+            "query":{
+                "bool":{
+                    "must":[
+                        {
+                            "match":{
+                                "key": "%s"
+                            }
+                        }
+                    ]
+                }
+            },
+            "sort":[
+                {
+                    "timeStamp":{
+                        "order":"asc"
+                    }
+                }
+            ],
+            "from": %d,
+            "size": %d
+        }`
+
+		query = fmt.Sprintf(query, key, from, pageSize)
+		res, _ := es.Search(index, query)
+		if len(res) == 0 {
+			break
 		}
-	}`
-	query = fmt.Sprintf(query, key)
-	res, _ := es.Search(index, query)
-	if len(res) != 0 {
-		result = res
+		result = append(result, res...)
+		pageNum++
 	}
 	return result
 }

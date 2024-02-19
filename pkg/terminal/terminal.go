@@ -105,38 +105,43 @@ func (t *Terminal) Close() {
 func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool) {
 	defer setQuit(quitChan)
 	for {
-		// 接受ws消息
-		_, message, err := ws.ReadMessage()
-		if err != nil {
-			_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("读取信息出错-%s", err.Error())))
+		select {
+		case <-quitChan:
 			return
-		}
-		// 解析ws消息
-		var data map[string]any
-		err = json.Unmarshal(message, &data)
-		if err != nil {
-			_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("发送的信息格式出错-%s", err.Error())))
-			return
-		}
-		resize, resizeOk := data["resize"]
-		if resizeOk {
-			resize_, _ := resize.([]any)
-			cols, _ := resize_[0].(int)
-			rows, _ := resize_[1].(int)
-			err = t.Session.WindowChange(cols, rows)
+		default:
+			// 接受ws消息
+			_, message, err := ws.ReadMessage()
 			if err != nil {
-				_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("调整窗口大小出错-%s", err.Error())))
+				_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("读取信息出错-%s", err.Error())))
 				return
 			}
-		}
-		text, textOk := data["data"]
-		if textOk {
-			text_, _ := text.(string)
-			// 输入到终端中
-			_, err = t.StdinPipe.Write([]byte(fmt.Sprintf("%s", text_)))
+			// 解析ws消息
+			var data map[string]any
+			err = json.Unmarshal(message, &data)
 			if err != nil {
-				_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%s", err.Error())))
+				_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("发送的信息格式出错-%s", err.Error())))
 				return
+			}
+			resize, resizeOk := data["resize"]
+			if resizeOk {
+				resize_, _ := resize.([]any)
+				cols, _ := resize_[0].(int)
+				rows, _ := resize_[1].(int)
+				err = t.Session.WindowChange(cols, rows)
+				if err != nil {
+					_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("调整窗口大小出错-%s", err.Error())))
+					return
+				}
+			}
+			text, textOk := data["data"]
+			if textOk {
+				text_, _ := text.(string)
+				// 输入到终端中
+				_, err = t.StdinPipe.Write([]byte(fmt.Sprintf("%s", text_)))
+				if err != nil {
+					_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%s", err.Error())))
+					return
+				}
 			}
 		}
 	}
@@ -146,31 +151,42 @@ func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool) {
 func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool, key string, startTime time.Time, record *recordAudit.EsRecord) {
 	defer setQuit(quitChan)
 	for {
-		if t.ComboOutput.buffer.Len() != 0 {
-			// 把操作记录写到es中
-			endTime := time.Now()
-			sub := endTime.Sub(startTime)
-			history, _ := json.Marshal([]any{sub, "o", string(t.ComboOutput.buffer.Bytes())})
-			data := map[string]any{
-				"key":       key,
-				"timeStamp": time.Now().Format("2006-01-02 15:04:05"),
-				"history":   string(history),
+		select {
+		case <-quitChan:
+			return
+		default:
+			if t.ComboOutput.buffer.Len() != 0 {
+				// 把操作记录写到es中
+				endTime := time.Now()
+				sub := endTime.Sub(startTime).Seconds()
+				history, _ := json.Marshal([]any{sub, "o", string(t.ComboOutput.buffer.Bytes())})
+				data := map[string]any{
+					"key":       key,
+					"timeStamp": time.Now().Format("2006-01-02 15:04:05"),
+					"history":   string(history),
+				}
+				record.WriteData(data)
+				// 往ws中输出
+				//fmt.Println("输出-", string(t.ComboOutput.buffer.Bytes()))
+				_ = ws.WriteMessage(websocket.TextMessage, t.ComboOutput.buffer.Bytes())
+				t.ComboOutput.buffer.Reset()
 			}
-			record.WriteData(data)
-			// 往ws中输出
-			//fmt.Println("输出-", string(t.ComboOutput.buffer.Bytes()))
-			_ = ws.WriteMessage(websocket.TextMessage, t.ComboOutput.buffer.Bytes())
-			t.ComboOutput.buffer.Reset()
 		}
 	}
+
 }
 
 // SessionWait 等待session结束
 func (t *Terminal) SessionWait(quitChan chan bool) {
 	defer setQuit(quitChan)
-	if err := t.Session.Wait(); err != nil {
-		logger.Error("session-wait失败-%s", err.Error())
+	select {
+	case <-quitChan:
 		return
+	default:
+		if err := t.Session.Wait(); err != nil {
+			logger.Error("session-wait失败-%s", err.Error())
+
+		}
 	}
 }
 
