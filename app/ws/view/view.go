@@ -102,10 +102,12 @@ func (w wsHandle) Handler(c *gin.Context) {
 	asciinema.WriteHeader(key, cols, rows, startTime, record)
 
 	// 核心交互
-	quitChan := make(chan bool, 3)
+	quitChan := make(chan bool, 4)
+	esDataChan := make(chan []byte)
 	go t.ReceiveWsMsg(conn, quitChan, key, startTime, record) // ws > terminal
-	go t.WriteWsMsg(conn, quitChan, key, startTime, record)   // terminal > ws
-	go t.SessionWait(quitChan)                                // 关闭session
+	go t.WriteWsMsg(conn, quitChan, esDataChan)               // terminal > ws
+	go t.WriteEsData(quitChan, key, startTime, record, esDataChan)
+	go t.SessionWait(quitChan) // 关闭session
 	<-quitChan
 
 }

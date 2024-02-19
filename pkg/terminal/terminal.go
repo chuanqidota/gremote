@@ -150,7 +150,7 @@ func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool, key stri
 }
 
 // WriteWsMsg 读取终端输出往ws中写消息
-func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool, key string, startTime time.Time, record *recordAudit.EsRecord) {
+func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool, esDataChan chan []byte) {
 	defer setQuit(quitChan)
 	for {
 		select {
@@ -161,12 +161,26 @@ func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool, key string
 				// 往ws中输出
 				_ = ws.WriteMessage(websocket.TextMessage, t.ComboOutput.buffer.Bytes())
 				// 把操作记录写到es中
-				asciinema.WriteData(key, startTime, string(t.ComboOutput.buffer.Bytes()), record)
+				esDataChan <- t.ComboOutput.buffer.Bytes()
+				// 重置ComboOutput的缓冲区
 				t.ComboOutput.buffer.Reset()
 			}
 		}
 	}
+}
 
+// WriteEsData 写入到数据到es中
+func (t *Terminal) WriteEsData(quitChan chan bool, key string, startTime time.Time, record *recordAudit.EsRecord, esDataChan chan []byte) {
+	defer setQuit(quitChan)
+	for {
+		select {
+		case <-quitChan:
+			return
+		case data := <-esDataChan:
+			// 将数据写入 ES
+			asciinema.WriteData(key, startTime, string(data), record)
+		}
+	}
 }
 
 // SessionWait 等待session结束
