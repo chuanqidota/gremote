@@ -3,6 +3,7 @@ package as3
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -11,7 +12,6 @@ import (
 )
 
 var As3Client *minio.Client
-var BucketName string = config.Conf.As3.Bucket
 
 func Init() {
 	endpoint := config.Conf.As3.EndPoint
@@ -32,8 +32,13 @@ func Init() {
 }
 
 // UploadFile 上传数据到as3中，文件名key
-func UploadFile(key, data string) {
-	_, err := As3Client.PutObject(context.Background(), BucketName, key, bytes.NewReader([]byte(data)), int64(len([]byte(data))), minio.PutObjectOptions{})
+func UploadFile(key string, data []any) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		logger.Error(fmt.Sprintf("上传As3前解析文件失败-%s", err.Error()))
+	}
+	BucketName := config.Conf.As3.Bucket
+	_, err = As3Client.PutObject(context.Background(), BucketName, key, bytes.NewReader(jsonData), int64(len(jsonData)), minio.PutObjectOptions{})
 	if err != nil {
 		logger.Error(fmt.Sprintf("上传As3文件失败-%s", err.Error()))
 	}

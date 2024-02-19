@@ -14,7 +14,7 @@ Audit:
   RecordAuditIndex: webssh-record
 As3:
   EndPoint: 127.0.0.1:9000
-  AccessKeyID: ""
-  SecretAccessKey: ""
-  UseSSL: true
+  AccessKeyID: daylTa9KWX8PPAguLmdS
+  SecretAccessKey: jaZriFaoHDvQ5bMS5ejs4WfxN7b06aRGoFoDZz9E
+  UseSSL: false
   Bucket: webssh

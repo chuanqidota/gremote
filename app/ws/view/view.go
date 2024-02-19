@@ -101,7 +101,7 @@ func (w wsHandle) Handler(c *gin.Context) {
 	history, _ := json.Marshal(map[string]any{"version": 2, "width": 80, "height": 24})
 	recordData := map[string]any{
 		"key":       key,
-		"timeStamp": time.Now().Format("2006-01-02 15:04:05"),
+		"timeStamp": time.Now().UnixNano() / int64(time.Millisecond),
 		"history":   string(history),
 	}
 	record.WriteData(recordData)

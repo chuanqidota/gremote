@@ -162,7 +162,7 @@ func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool, key string
 				history, _ := json.Marshal([]any{sub, "o", string(t.ComboOutput.buffer.Bytes())})
 				data := map[string]any{
 					"key":       key,
-					"timeStamp": time.Now().Format("2006-01-02 15:04:05"),
+					"timeStamp": time.Now().UnixNano() / int64(time.Millisecond),
 					"history":   string(history),
 				}
 				record.WriteData(data)

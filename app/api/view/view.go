@@ -7,6 +7,7 @@ import (
 	"webssh-go/app/api/params"
 	"webssh-go/app/ws/utils/recordAudit"
 	"webssh-go/config"
+	"webssh-go/pkg/as3"
 	"webssh-go/pkg/response"
 
 	"strings"
@@ -144,7 +145,7 @@ func (a *apiHandle) RecordUrl(c *gin.Context) {
 	}
 	endpoint := config.Conf.As3.EndPoint
 	bucket := config.Conf.As3.Bucket
-
+	// 从es中读取数据
 	record := recordAudit.NewEsRecord()
 	result := record.ReadData(key)
 	var data []any
@@ -154,8 +155,9 @@ func (a *apiHandle) RecordUrl(c *gin.Context) {
 		_ = json.Unmarshal([]byte(history), &v)
 		data = append(data, v)
 	}
-	fmt.Println(data)
+	// 上传到as3中-会覆盖更新
+	as3.UploadFile(key, data)
 
 	url := fmt.Sprintf("http://%s/%s/%s", endpoint, bucket, key)
-	response.Success(c, "执行成功", map[string]any{"url": url, "data": data})
+	response.Success(c, "执行成功", url)
 }
