@@ -9,6 +9,7 @@ import (
 	"webssh-go/app/api/params"
 	"webssh-go/app/ws/utils/loginAudit"
 	"webssh-go/app/ws/utils/recordAudit"
+	"webssh-go/pkg/asciinema"
 	"webssh-go/pkg/logger"
 	"webssh-go/pkg/redis"
 	"webssh-go/pkg/terminal"
@@ -98,19 +99,13 @@ func (w wsHandle) Handler(c *gin.Context) {
 	// 记录操作到es中
 	startTime := time.Now()
 	record := recordAudit.NewEsRecord()
-	history, _ := json.Marshal(map[string]any{"version": 2, "width": 80, "height": 24})
-	recordData := map[string]any{
-		"key":       key,
-		"timeStamp": time.Now().UnixNano() / int64(time.Millisecond),
-		"history":   string(history),
-	}
-	record.WriteData(recordData)
+	asciinema.WriteHeader(key, cols, rows, startTime, record)
 
 	// 核心交互
 	quitChan := make(chan bool, 3)
-	go t.ReceiveWsMsg(conn, quitChan)                       // ws > terminal
-	go t.WriteWsMsg(conn, quitChan, key, startTime, record) // terminal > ws
-	go t.SessionWait(quitChan)                              // 关闭session
+	go t.ReceiveWsMsg(conn, quitChan, key, startTime, record) // ws > terminal
+	go t.WriteWsMsg(conn, quitChan, key, startTime, record)   // terminal > ws
+	go t.SessionWait(quitChan)                                // 关闭session
 	<-quitChan
 
 }

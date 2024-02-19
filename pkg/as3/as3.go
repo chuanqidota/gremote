@@ -38,6 +38,7 @@ func UploadFile(key string, data []any) {
 		logger.Error(fmt.Sprintf("上传As3前解析文件失败-%s", err.Error()))
 	}
 	BucketName := config.Conf.As3.Bucket
+	//_, err := As3Client.PutObject(context.Background(), BucketName, key, bytes.NewReader([]byte(data)), int64(len([]byte(data))), minio.PutObjectOptions{})
 	_, err = As3Client.PutObject(context.Background(), BucketName, key, bytes.NewReader(jsonData), int64(len(jsonData)), minio.PutObjectOptions{})
 	if err != nil {
 		logger.Error(fmt.Sprintf("上传As3文件失败-%s", err.Error()))

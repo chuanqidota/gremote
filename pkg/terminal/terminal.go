@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 	"webssh-go/app/ws/utils/recordAudit"
+	"webssh-go/pkg/asciinema"
 	"webssh-go/pkg/logger"
 )
 
@@ -102,7 +103,7 @@ func (t *Terminal) Close() {
 }
 
 // ReceiveWsMsg 接受ws消息 发送到terminal
-func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool) {
+func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool, key string, startTime time.Time, record *recordAudit.EsRecord) {
 	defer setQuit(quitChan)
 	for {
 		select {
@@ -125,13 +126,14 @@ func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool) {
 			resize, resizeOk := data["resize"]
 			if resizeOk {
 				resize_, _ := resize.([]any)
-				cols, _ := resize_[0].(int)
-				rows, _ := resize_[1].(int)
+				cols := int(resize_[0].(float64))
+				rows := int(resize_[1].(float64))
 				err = t.Session.WindowChange(cols, rows)
 				if err != nil {
 					_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("调整窗口大小出错-%s", err.Error())))
 					return
 				}
+				asciinema.WriteSize(key, startTime, cols, rows, record)
 			}
 			text, textOk := data["data"]
 			if textOk {
@@ -157,15 +159,7 @@ func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool, key string
 		default:
 			if t.ComboOutput.buffer.Len() != 0 {
 				// 把操作记录写到es中
-				endTime := time.Now()
-				sub := endTime.Sub(startTime).Seconds()
-				history, _ := json.Marshal([]any{sub, "o", string(t.ComboOutput.buffer.Bytes())})
-				data := map[string]any{
-					"key":       key,
-					"timeStamp": time.Now().UnixNano() / int64(time.Millisecond),
-					"history":   string(history),
-				}
-				record.WriteData(data)
+				asciinema.WriteData(key, startTime, string(t.ComboOutput.buffer.Bytes()), record)
 				// 往ws中输出
 				//fmt.Println("输出-", string(t.ComboOutput.buffer.Bytes()))
 				_ = ws.WriteMessage(websocket.TextMessage, t.ComboOutput.buffer.Bytes())
