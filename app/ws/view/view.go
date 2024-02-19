@@ -8,6 +8,7 @@ import (
 	"time"
 	"webssh-go/app/api/params"
 	"webssh-go/app/ws/utils/loginAudit"
+	"webssh-go/app/ws/utils/recordAudit"
 	"webssh-go/pkg/logger"
 	"webssh-go/pkg/redis"
 	"webssh-go/pkg/terminal"
@@ -56,14 +57,14 @@ func (w wsHandle) Handler(c *gin.Context) {
 
 	// 登录信息写入到es中
 	e := loginAudit.NewEsAudit()
-	data := map[string]any{
+	auditData := map[string]any{
 		"key":       key,
 		"startTime": time.Now().Format("2006-01-02 15:04:05"),
 		"user":      info.User,
 		"source":    info.Source,
 		"target":    info.Target,
 	}
-	e.WriteData(data)
+	e.WriteData(auditData)
 	defer e.UpdateEndTime(key)
 
 	// 接受第一次消息
@@ -94,11 +95,22 @@ func (w wsHandle) Handler(c *gin.Context) {
 	defer t.Close()
 	logger.Info("websocket连接成功-等待终端发送消息")
 
-	// 接受消息
+	// 记录操作到es中
+	startTime := time.Now()
+	record := recordAudit.NewEsRecord()
+	history, _ := json.Marshal(map[string]any{"version": 2, "width": 80, "height": 24})
+	recordData := map[string]any{
+		"key":       key,
+		"timeStamp": time.Now().Format("2006-01-02 15:04:05"),
+		"history":   string(history),
+	}
+	record.WriteData(recordData)
+
+	// 核心交互
 	quitChan := make(chan bool, 3)
-	go t.ReceiveWsMsg(conn, quitChan) // ws > terminal
-	go t.WriteWsMsg(conn, quitChan)   // terminal > ws
-	go t.SessionWait(quitChan)        // 关闭session
+	go t.ReceiveWsMsg(conn, quitChan)                       // ws > terminal
+	go t.WriteWsMsg(conn, quitChan, key, startTime, record) // terminal > ws
+	go t.SessionWait(quitChan)                              // 关闭session
 	<-quitChan
 
 }

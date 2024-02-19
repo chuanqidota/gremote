@@ -9,6 +9,7 @@ import (
 	"io"
 	"sync"
 	"time"
+	"webssh-go/app/ws/utils/recordAudit"
 	"webssh-go/pkg/logger"
 )
 
@@ -142,16 +143,26 @@ func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool) {
 }
 
 // WriteWsMsg 读取终端输出往ws中写消息
-func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool) {
+func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool, key string, startTime time.Time, record *recordAudit.EsRecord) {
 	defer setQuit(quitChan)
 	for {
 		if t.ComboOutput.buffer.Len() != 0 {
+			// 把操作记录写到es中
+			endTime := time.Now()
+			sub := endTime.Sub(startTime)
+			history, _ := json.Marshal([]any{sub, "o", string(t.ComboOutput.buffer.Bytes())})
+			data := map[string]any{
+				"key":       key,
+				"timeStamp": time.Now().Format("2006-01-02 15:04:05"),
+				"history":   string(history),
+			}
+			record.WriteData(data)
+			// 往ws中输出
 			//fmt.Println("输出-", string(t.ComboOutput.buffer.Bytes()))
 			_ = ws.WriteMessage(websocket.TextMessage, t.ComboOutput.buffer.Bytes())
 			t.ComboOutput.buffer.Reset()
 		}
 	}
-
 }
 
 // SessionWait 等待session结束
