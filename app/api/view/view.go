@@ -1,7 +1,7 @@
 package view
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
 	"time"
 	"webssh-go/app/api/params"
@@ -148,15 +148,16 @@ func (a *apiHandle) RecordUrl(c *gin.Context) {
 	// 从es中读取数据
 	record := recordAudit.NewEsRecord()
 	result := record.ReadData(key)
-	var data []any
+
+	var buffer bytes.Buffer
 	for _, value := range result {
 		history, _ := value["history"].(string)
-		var v any
-		_ = json.Unmarshal([]byte(history), &v)
-		data = append(data, v)
+		buffer.Write([]byte(history))
+		buffer.WriteByte('\n')
 	}
+
 	// 上传到as3中-会覆盖更新
-	as3.UploadFile(key, data)
+	as3.UploadFile(key, buffer.Bytes())
 
 	url := fmt.Sprintf("http://%s/%s/%s", endpoint, bucket, key)
 	response.Success(c, "执行成功", url)

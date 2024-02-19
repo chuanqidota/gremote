@@ -158,11 +158,10 @@ func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool, key string
 			return
 		default:
 			if t.ComboOutput.buffer.Len() != 0 {
+				// 往ws中输出
+				_ = ws.WriteMessage(websocket.TextMessage, t.ComboOutput.buffer.Bytes())
 				// 把操作记录写到es中
 				asciinema.WriteData(key, startTime, string(t.ComboOutput.buffer.Bytes()), record)
-				// 往ws中输出
-				//fmt.Println("输出-", string(t.ComboOutput.buffer.Bytes()))
-				_ = ws.WriteMessage(websocket.TextMessage, t.ComboOutput.buffer.Bytes())
 				t.ComboOutput.buffer.Reset()
 			}
 		}
@@ -179,7 +178,6 @@ func (t *Terminal) SessionWait(quitChan chan bool) {
 	default:
 		if err := t.Session.Wait(); err != nil {
 			logger.Error("session-wait失败-%s", err.Error())
-
 		}
 	}
 }
