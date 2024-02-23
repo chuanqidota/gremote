@@ -25,3 +25,4 @@ go.work
 /.idea/.gitignore
 ./log/*
 .log/*
+/.idea/*

@@ -1,12 +1,12 @@
 Server:
   Ip: 0.0.0.0
-  Port: 8080
+  Port: 8000
 Redis:
   Addr: 127.0.0.1:6379
   PassWord: ""
   DB: 0
 ElasticSearch:
-  Url: http://127.0.0.1:9200
+  Url: http://192.168.127.2:9200
   Username: ""
   Password: ""
 Audit:
@@ -14,7 +14,7 @@ Audit:
   RecordAuditIndex: webssh-record
 As3:
   EndPoint: 127.0.0.1:9000
-  AccessKeyID: daylTa9KWX8PPAguLmdS
-  SecretAccessKey: jaZriFaoHDvQ5bMS5ejs4WfxN7b06aRGoFoDZz9E
+  AccessKeyID: teID3J2ObR41qiIQyYEH
+  SecretAccessKey: j7loHshIjmhM3MmKFnFgRy7xdSHAFesHcFOtmRe9
   UseSSL: false
   Bucket: webssh

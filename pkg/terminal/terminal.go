@@ -132,7 +132,6 @@ func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool, key stri
 						_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("调整窗口大小出错-%s", err.Error())))
 						return
 					}
-					asciinema.WriteSize(key, startTime, cols, rows, record)
 				}
 			}
 		}
@@ -150,7 +149,6 @@ func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool, esDataChan
 			if t.ComboOutput.buffer.Len() != 0 {
 				// 往ws中输出
 				_ = ws.WriteMessage(websocket.TextMessage, t.ComboOutput.buffer.Bytes())
-				fmt.Println("发---", string(t.ComboOutput.buffer.Bytes()))
 				// 把操作记录写到es中
 				esDataChan <- t.ComboOutput.buffer.Bytes()
 				// 重置ComboOutput的缓冲区

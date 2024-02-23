@@ -17,6 +17,7 @@ func Init() {
 	client, err := elastic.NewClient(
 		elastic.SetURL(config.Conf.ElasticSearch.Url),
 		elastic.SetBasicAuth(config.Conf.ElasticSearch.Username, config.Conf.ElasticSearch.Password), // 用户名和密码
+		elastic.SetSniff(false), // 用于关闭 Sniff 不然会出现no active connection found: no Elasticsearch node available
 	)
 	if err != nil {
 		logger.Error(fmt.Sprintf("es连接失败-%s", err.Error()))

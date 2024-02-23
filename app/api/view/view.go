@@ -39,7 +39,7 @@ func (a *apiHandle) ObtainKey(c *gin.Context) {
 		response.Fail(c, fmt.Sprintf("redis设置失败-%s", err.Error()))
 		return
 	}
-	response.Success(c, "执行成功", map[string]string{"result": key})
+	response.KeyRes(c, key)
 }
 
 // ListFile 列出目录下的文件-大小-类型

@@ -29,3 +29,9 @@ func File(c *gin.Context, filename string, res []byte) {
 	c.Data(http.StatusOK, "application/octet-stream", res)
 
 }
+
+func KeyRes(c *gin.Context, key string) {
+	c.JSON(http.StatusOK, gin.H{
+		"key": key,
+	})
+}

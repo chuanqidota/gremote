@@ -104,12 +104,12 @@ func (w wsHandle) Handler(c *gin.Context) {
 	// 核心交互
 	quitChan := make(chan bool, 4)
 	defer close(quitChan)
-	esDataChan := make(chan []byte)
+	esDataChan := make(chan []byte, 1024*1024)
 	defer close(esDataChan)
-	go t.ReceiveWsMsg(conn, quitChan, key, startTime, record) // ws > terminal
-	go t.WriteWsMsg(conn, quitChan, esDataChan)               // terminal > ws & chan
+	go t.ReceiveWsMsg(conn, quitChan, key, startTime, record)      // ws > terminal
+	go t.WriteWsMsg(conn, quitChan, esDataChan)                    // terminal > ws & chan
 	go t.WriteEsData(quitChan, key, startTime, record, esDataChan) // chan > es
-	go t.SessionWait(quitChan) // 关闭session
+	go t.SessionWait(quitChan)                                     // 关闭session
 	<-quitChan
 
 }
