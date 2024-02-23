@@ -120,29 +120,19 @@ func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool, key stri
 			var data map[string]any
 			err = json.Unmarshal(message, &data)
 			if err != nil {
-				_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("发送的信息格式出错-%s", err.Error())))
-				return
-			}
-			resize, resizeOk := data["resize"]
-			if resizeOk {
-				resize_, _ := resize.([]any)
-				cols := int(resize_[0].(float64))
-				rows := int(resize_[1].(float64))
-				err = t.Session.WindowChange(cols, rows)
-				if err != nil {
-					_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("调整窗口大小出错-%s", err.Error())))
-					return
-				}
-				asciinema.WriteSize(key, startTime, cols, rows, record)
-			}
-			text, textOk := data["data"]
-			if textOk {
-				text_, _ := text.(string)
-				// 输入到终端中
-				_, err = t.StdinPipe.Write([]byte(fmt.Sprintf("%s", text_)))
-				if err != nil {
-					_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%s", err.Error())))
-					return
+				_, err = t.StdinPipe.Write(message)
+			} else {
+				resize, resizeOk := data["resize"]
+				if resizeOk {
+					resize_, _ := resize.([]any)
+					cols := int(resize_[0].(float64))
+					rows := int(resize_[1].(float64))
+					err = t.Session.WindowChange(cols, rows)
+					if err != nil {
+						_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("调整窗口大小出错-%s", err.Error())))
+						return
+					}
+					asciinema.WriteSize(key, startTime, cols, rows, record)
 				}
 			}
 		}
@@ -160,6 +150,7 @@ func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool, esDataChan
 			if t.ComboOutput.buffer.Len() != 0 {
 				// 往ws中输出
 				_ = ws.WriteMessage(websocket.TextMessage, t.ComboOutput.buffer.Bytes())
+				fmt.Println("发---", string(t.ComboOutput.buffer.Bytes()))
 				// 把操作记录写到es中
 				esDataChan <- t.ComboOutput.buffer.Bytes()
 				// 重置ComboOutput的缓冲区
