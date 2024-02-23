@@ -18,7 +18,22 @@ services:
       - "9200:9200"
     volumes:
       - es_data:/usr/share/elasticsearch/data
+  
+  # minio
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "9000:9000"
+    environment:
+      MINIO_ACCESS_KEY: your_access_key
+      MINIO_SECRET_KEY: your_secret_key
+    volumes:
+      - minio_data:/data
+    command: server /data
+
 
 volumes:
   mysql_data:
   es_data:
+  minio_data:
