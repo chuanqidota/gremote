@@ -10,7 +10,6 @@ import (
 	"webssh-go/app/ws/utils/loginAudit"
 	"webssh-go/app/ws/utils/recordAudit"
 	"webssh-go/pkg/asciinema"
-	"webssh-go/pkg/logger"
 	"webssh-go/pkg/redis"
 	"webssh-go/pkg/terminal"
 )
@@ -79,6 +78,9 @@ func (w wsHandle) Handler(c *gin.Context) {
 	cols := firstData["resize"][0]
 	rows := firstData["resize"][1]
 
+	// 连接耗时-增加友好提示
+	_ = conn.WriteMessage(websocket.TextMessage, []byte("终端正在连接中,请稍等..."))
+
 	// ssh客户端
 	client, err := terminal.Client(info.Username, info.Password, info.Target, info.Port)
 	if err != nil {
@@ -94,12 +96,14 @@ func (w wsHandle) Handler(c *gin.Context) {
 		return
 	}
 	defer t.Close()
-	logger.Info("websocket连接成功-等待终端发送消息")
 
 	// 记录操作到es中
 	startTime := time.Now()
 	record := recordAudit.NewEsRecord()
 	asciinema.WriteHeader(key, cols, rows, startTime, record)
+
+	// 清屏操作 \033[2J 表示清除屏幕上的所有内容 \033[H 表示将光标移动到屏幕的左上角（也就是原点）。
+	_ = conn.WriteMessage(websocket.TextMessage, []byte("\033[2J\033[H"))
 
 	// 核心交互
 	quitChan := make(chan bool, 4)
@@ -109,7 +113,7 @@ func (w wsHandle) Handler(c *gin.Context) {
 	go t.ReceiveWsMsg(conn, quitChan, key, startTime, record)      // ws > terminal
 	go t.WriteWsMsg(conn, quitChan, esDataChan)                    // terminal > ws & chan
 	go t.WriteEsData(quitChan, key, startTime, record, esDataChan) // chan > es
-	go t.SessionWait(quitChan)                                     // 关闭session
 	<-quitChan
-
+	t.SessionWait(quitChan) // 最后关闭session 这里执行exit-然后关闭页面。修改别的有报错
+	time.Sleep(2 * time.Second)
 }
