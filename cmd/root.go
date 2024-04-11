@@ -5,8 +5,10 @@ package cmd
 
 import (
 	"os"
+	"os/signal"
 	"webssh-go/pkg/as3"
 
+	"context"
 	"webssh-go/config"
 	"webssh-go/pkg/es"
 	"webssh-go/pkg/logger"
@@ -54,6 +56,19 @@ func Run() {
 		WriteTimeout:   60 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
+	go func() {
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		<-c
+
+		// 创建一个5秒的上下文，以便优雅关闭
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := server.Shutdown(ctx); err != nil {
+			fmt.Println(err.Error())
+		}
+	}()
 	if err := server.ListenAndServe(); err != nil {
 		fmt.Println(err.Error())
 	}
