@@ -16,4 +16,4 @@ draw.io>github>webssh-go
 ##### 2、ws/v1/{key} 连接终端
 ##### 3、发送命令
 ##### 4、ws/v1/record-url 获取回放的url
-
+[![Stargazers repo roster for @chuanqidota/webssh-go](https://reporoster.com/stars/chuanqidota/webssh-go)](https://github.com/chuanqidota/webssh-go/stargazers)
