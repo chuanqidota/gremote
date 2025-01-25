@@ -1,8 +1,6 @@
 # webssh-go
 go版本实现的webssh后端
 
-### 设计思路见
-draw.io>github>webssh-go
 
 ### 启动前准备
 #### 配置config.
