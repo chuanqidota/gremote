@@ -31,6 +31,17 @@ services:
     volumes:
       - minio_data:/data
     command: server /data
+  
+  # 项目本身
+  drf:
+    restart: always
+    build: 
+      context: . # 指定Dockerfile文件所在路径
+      dockerfile: Dockerfile # 指定Dockerfile文件名称
+    image: webssh:latest
+    container_name: webssh
+    ports:
+     - "8000:8000"
 
 
 volumes:
