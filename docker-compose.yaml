@@ -33,7 +33,7 @@ services:
     command: server /data
   
   # 项目本身
-  drf:
+  webssh:
     restart: always
     build: 
       context: . # 指定Dockerfile文件所在路径
