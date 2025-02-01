@@ -56,13 +56,10 @@ func Get(key string, value any) error {
 }
 
 // DeleteKey 删除指定的键
-func DeleteKey(key string) error {
-	err := RedisClient.Del(context.Background(), key).Err()
-	if err != nil {
-		logger.Error(fmt.Sprintf("删除键：%s", err.Error()))
-		return err
-	}
-	return nil
+func DeleteKey(key string) {
+	isConnectedKey := key+"_connected"
+	RedisClient.Del(context.Background(), key)
+	RedisClient.Del(context.Background(),isConnectedKey)
 }
 
 // Exist 判断key存不存在
@@ -77,4 +74,14 @@ func Exist(key string) bool {
 	} else {
 		return true
 	}
+}
+
+// IsConnected 判断有没有连接过
+func IsConnected(key string)bool{
+	isConnectedKey := key+"_connected"
+	if Exist(isConnectedKey) {
+		return true
+	}
+	Set(isConnectedKey,true,24*60*60*time.Second)
+	return false
 }

@@ -2,8 +2,6 @@ package view
 
 import (
 	"encoding/json"
-	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
 	"net/http"
 	"time"
 	"webssh-go/app/api/params"
@@ -12,6 +10,9 @@ import (
 	"webssh-go/pkg/asciinema"
 	"webssh-go/pkg/redis"
 	"webssh-go/pkg/terminal"
+
+	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 )
 
 type wsHandle struct {
@@ -41,10 +42,11 @@ func (w wsHandle) Handler(c *gin.Context) {
 		return
 	}
 	// redis中不存在>属于第二次登录
-	if !redis.Exist(key) {
-		_ = conn.WriteMessage(websocket.TextMessage, []byte("链接失效"))
+	if redis.IsConnected(key) {
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("链接失效,已经被链接过一次"))
 		return
 	}
+
 	// 通过key获取redis中>用户信息
 	var info params.Info
 	err = redis.Get(key, &info)
@@ -52,8 +54,6 @@ func (w wsHandle) Handler(c *gin.Context) {
 		_ = conn.WriteMessage(websocket.TextMessage, []byte("获取登录信息失败"))
 		return
 	}
-	// 获取成功以后删除redis中的key
-	_ = redis.DeleteKey(key)
 
 	// 登录信息写入到es中
 	e := loginAudit.NewEsAudit()
@@ -115,5 +115,8 @@ func (w wsHandle) Handler(c *gin.Context) {
 	go t.WriteEsData(quitChan, key, startTime, record, esDataChan) // chan > es
 	<-quitChan
 	t.SessionWait(quitChan) // 最后关闭session 这里执行exit-然后关闭页面。修改别的有报错
+	// 获取成功以后删除redis中的key
+	redis.DeleteKey(key)
+
 	time.Sleep(2 * time.Second)
 }

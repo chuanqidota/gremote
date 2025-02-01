@@ -35,7 +35,7 @@ func (a *apiHandle) ObtainKey(c *gin.Context) {
 	_uuid := uuid.New().String()
 	key := strings.Replace(_uuid, "-", "", -1)
 
-	if err := redis.Set(key, info, time.Second*60*24); err != nil {
+	if err := redis.Set(key, info, 24*60*60*time.Second); err != nil {
 		response.Fail(c, fmt.Sprintf("redis设置失败-%s", err.Error()))
 		return
 	}
