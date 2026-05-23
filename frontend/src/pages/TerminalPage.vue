@@ -19,6 +19,9 @@
         <el-button size="small" @click="openFileBrowser">
           Files
         </el-button>
+        <el-button size="small" @click="toggleFullscreen">
+          {{ isFullscreen ? 'Exit' : 'Maximize' }}
+        </el-button>
       </div>
     </div>
     <div ref="termContainer" class="terminal-container" />
@@ -132,11 +135,27 @@ const toolbarStyle = computed(() => ({
   borderColor: themes[currentTheme.value].border,
 }))
 
+const isFullscreen = ref(false)
+
+function onFullscreenChange() {
+  isFullscreen.value = !!document.fullscreenElement
+}
+
+function toggleFullscreen() {
+  if (document.fullscreenElement) {
+    document.exitFullscreen()
+  } else {
+    document.documentElement.requestFullscreen()
+  }
+}
+
 onMounted(() => {
   if (!key) {
     ElMessage.error('Missing connection key')
     return
   }
+
+  document.addEventListener('fullscreenchange', onFullscreenChange)
 
   const socket = connect(wsHost)
 
@@ -204,6 +223,7 @@ function onFileUploaded() {
 }
 
 onBeforeUnmount(() => {
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
   window.removeEventListener('resize', onResize)
   term?.dispose()
 })
