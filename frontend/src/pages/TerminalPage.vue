@@ -37,7 +37,7 @@ import FileUploadDialog from '../components/FileUploadDialog.vue'
 
 const route = useRoute()
 const key = route.query.key as string
-const wsHost = import.meta.env.VITE_WS_HOST
+const wsHost = import.meta.env.VITE_WS_HOST || window.location.host
 
 const termContainer = ref<HTMLDivElement>()
 const fileListVisible = ref(false)
