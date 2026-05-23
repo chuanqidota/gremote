@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-	"webssh-go/config"
-	"webssh-go/pkg/es"
-	"webssh-go/pkg/logger"
+	"gwebssh/config"
+	"gwebssh/pkg/es"
+	"gwebssh/pkg/logger"
 )
 
 type EsRecord struct {

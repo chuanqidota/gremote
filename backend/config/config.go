@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 	"github.com/spf13/viper"
-	"webssh-go/pkg/logger"
+	"gwebssh/pkg/logger"
 )
 
 type Config struct {

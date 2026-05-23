@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-	"webssh-go/app/api/params"
-	"webssh-go/config"
-	"webssh-go/pkg/es"
-	"webssh-go/pkg/logger"
+	"gwebssh/app/api/params"
+	"gwebssh/config"
+	"gwebssh/pkg/es"
+	"gwebssh/pkg/logger"
 )
 
 type EsAudit struct {

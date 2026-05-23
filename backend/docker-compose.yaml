@@ -33,13 +33,13 @@ services:
     command: server /data
   
   # 项目本身
-  webssh:
+  gwebssh:
     restart: always
     build: 
       context: . # 指定Dockerfile文件所在路径
       dockerfile: Dockerfile # 指定Dockerfile文件名称
-    image: webssh:latest
-    container_name: webssh
+    image: gwebssh:latest
+    container_name: gwebssh
     ports:
      - "8000:8000"
 

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-	"webssh-go/app/ws/utils/recordAudit"
+	"gwebssh/app/ws/utils/recordAudit"
 )
 
 // asciinema 文档https://docs.asciinema.org/manual/asciicast/v2/

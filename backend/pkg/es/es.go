@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"webssh-go/config"
-	"webssh-go/pkg/logger"
+	"gwebssh/config"
+	"gwebssh/pkg/logger"
 
 	"github.com/olivere/elastic/v7"
 )

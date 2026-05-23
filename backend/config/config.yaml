@@ -10,11 +10,11 @@ ElasticSearch:
   Username: ""
   Password: ""
 Audit:
-  LoginAuditIndex: webssh-login
-  RecordAuditIndex: webssh-record
+  LoginAuditIndex: gwebssh-login
+  RecordAuditIndex: gwebssh-record
 As3:
   EndPoint: 127.0.0.1:9000
   AccessKeyID: teID3J2ObR41qiIQyYEH
   SecretAccessKey: j7loHshIjmhM3MmKFnFgRy7xdSHAFesHcFOtmRe9
   UseSSL: false
-  Bucket: webssh
+  Bucket: gwebssh

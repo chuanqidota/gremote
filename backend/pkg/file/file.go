@@ -2,9 +2,9 @@ package file
 
 import (
 	"fmt"
-	"webssh-go/app/api/params"
+	"gwebssh/app/api/params"
 
-	"webssh-go/pkg/logger"
+	"gwebssh/pkg/logger"
 
 	"io"
 	"mime/multipart"
@@ -13,7 +13,7 @@ import (
 	"bytes"
 
 	"github.com/pkg/sftp"
-	"webssh-go/pkg/terminal"
+	"gwebssh/pkg/terminal"
 )
 
 type fileHandle struct {

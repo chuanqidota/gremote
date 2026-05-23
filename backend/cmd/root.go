@@ -6,14 +6,14 @@ package cmd
 import (
 	"os"
 	"os/signal"
-	"webssh-go/pkg/as3"
+	"gwebssh/pkg/as3"
 
 	"context"
-	"webssh-go/config"
-	"webssh-go/pkg/es"
-	"webssh-go/pkg/logger"
-	"webssh-go/pkg/redis"
-	"webssh-go/router"
+	"gwebssh/config"
+	"gwebssh/pkg/es"
+	"gwebssh/pkg/logger"
+	"gwebssh/pkg/redis"
+	"gwebssh/router"
 
 	"fmt"
 	"net/http"
@@ -24,7 +24,7 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "webssh-go",
+	Use:   "gwebssh",
 	Short: "go版本的webssh",
 	Long:  "go版本的webssh",
 	Run: func(cmd *cobra.Command, args []string) {

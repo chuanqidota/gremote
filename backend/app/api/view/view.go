@@ -4,20 +4,20 @@ import (
 	"bytes"
 	"fmt"
 	"time"
-	"webssh-go/app/api/params"
-	"webssh-go/app/ws/utils/recordAudit"
-	"webssh-go/config"
-	"webssh-go/pkg/as3"
-	"webssh-go/pkg/response"
+	"gwebssh/app/api/params"
+	"gwebssh/app/ws/utils/recordAudit"
+	"gwebssh/config"
+	"gwebssh/pkg/as3"
+	"gwebssh/pkg/response"
 
 	"strings"
-	"webssh-go/pkg/redis"
+	"gwebssh/pkg/redis"
 
-	"webssh-go/pkg/file"
+	"gwebssh/pkg/file"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"webssh-go/app/ws/utils/loginAudit"
+	"gwebssh/app/ws/utils/loginAudit"
 )
 
 type apiHandle struct {

@@ -4,7 +4,7 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 */
 package main
 
-import "webssh-go/cmd"
+import "gwebssh/cmd"
 
 func main() {
 	cmd.Execute()

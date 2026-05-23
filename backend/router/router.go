@@ -1,9 +1,9 @@
 package router
 
 import (
-	api_view "webssh-go/app/api/view"
-	ws_view "webssh-go/app/ws/view"
-	"webssh-go/pkg/middleware"
+	api_view "gwebssh/app/api/view"
+	ws_view "gwebssh/app/ws/view"
+	"gwebssh/pkg/middleware"
 
 	"github.com/gin-gonic/gin"
 )

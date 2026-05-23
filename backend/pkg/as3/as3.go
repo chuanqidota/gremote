@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"webssh-go/config"
-	"webssh-go/pkg/logger"
+	"gwebssh/config"
+	"gwebssh/pkg/logger"
 )
 
 var As3Client *minio.Client

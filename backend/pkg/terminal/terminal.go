@@ -9,9 +9,9 @@ import (
 	"io"
 	"sync"
 	"time"
-	"webssh-go/app/ws/utils/recordAudit"
-	"webssh-go/pkg/asciinema"
-	"webssh-go/pkg/logger"
+	"gwebssh/app/ws/utils/recordAudit"
+	"gwebssh/pkg/asciinema"
+	"gwebssh/pkg/logger"
 )
 
 // Client ssh客户端

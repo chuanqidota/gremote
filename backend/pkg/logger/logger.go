@@ -13,7 +13,7 @@ var logger = logrus.New()
 func Init() {
 	// 创建一个 lumberjack.Logger 实例，用于日志切割
 	logFile := &lumberjack.Logger{
-		Filename:   "./log/webssh.log", // 日志文件名
+		Filename:   "./log/gwebssh.log", // 日志文件名
 		MaxSize:    10,                 // 每个日志文件最大大小，单位为 MB
 		MaxBackups: 5,                  // 最多保留的旧日志文件数量
 		MaxAge:     7,                  // 最长保留的旧日志文件天数

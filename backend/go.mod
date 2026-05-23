@@ -1,4 +1,4 @@
-module webssh-go
+module gwebssh
 
 go 1.21.6
 

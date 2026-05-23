@@ -1,5 +1,5 @@
-# webssh-go
-go版本实现的webssh后端
+# gwebssh
+go版本实现的webssh后端（gwebssh）
 
 
 ### 启动前准备
@@ -14,4 +14,4 @@ go版本实现的webssh后端
 ##### 2、ws/v1/{key} 连接终端
 ##### 3、发送命令
 ##### 4、ws/v1/record-url 获取回放的url
-[![Stargazers repo roster for @chuanqidota/webssh-go](https://reporoster.com/stars/chuanqidota/webssh-go)](https://github.com/chuanqidota/webssh-go/stargazers)
+[![Stargazers repo roster for @chuanqidota/gwebssh](https://reporoster.com/stars/chuanqidota/gwebssh)](https://github.com/chuanqidota/gwebssh/stargazers)

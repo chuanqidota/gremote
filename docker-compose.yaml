@@ -35,8 +35,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    image: webssh-backend:latest
-    container_name: webssh-backend
+    image: gwebssh-backend:latest
+    container_name: gwebssh-backend
     restart: always
     ports:
       - "8000:8000"
@@ -49,8 +49,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    image: webssh-frontend:latest
-    container_name: webssh-frontend
+    image: gwebssh-frontend:latest
+    container_name: gwebssh-frontend
     restart: always
     ports:
       - "80:80"

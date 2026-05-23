@@ -7,14 +7,14 @@ RUN mkdir -p /opt
 WORKDIR /opt
 COPY . .
 RUN go mod tidy
-RUN go build -o webssh main.go
+RUN go build -o gwebssh main.go
 
 FROM alpine:3
 RUN mkdir -p /opt
 WORKDIR /opt
-COPY --from=builder /opt/webssh /opt/webssh
+COPY --from=builder /opt/gwebssh /opt/gwebssh
 COPY --from=builder /opt/config /opt/config
-RUN chmod +x /opt/webssh
+RUN chmod +x /opt/gwebssh
 EXPOSE 8000
 
-ENTRYPOINT ["/opt/webssh"]
+ENTRYPOINT ["/opt/gwebssh"]
