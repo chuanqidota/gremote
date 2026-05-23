@@ -13,6 +13,11 @@ import (
 
 var ElasticSearch *elastic.Client
 
+// IsReady 检查ES客户端是否可用
+func IsReady() bool {
+	return ElasticSearch != nil
+}
+
 func Init() {
 	client, err := elastic.NewClient(
 		elastic.SetURL(config.Conf.ElasticSearch.Url),
@@ -33,6 +38,9 @@ func Init() {
 //	@param index
 //	@return error
 func CreateIndex(index string) error {
+	if !IsReady() {
+		return errors.New("elasticsearch not initialized")
+	}
 	createIndex, err := ElasticSearch.CreateIndex(index).Do(context.Background())
 	if err != nil || !createIndex.Acknowledged {
 		return err
@@ -47,6 +55,9 @@ func CreateIndex(index string) error {
 //	@param index
 //	@return error
 func DeleteIndex(index string) error {
+	if !IsReady() {
+		return errors.New("elasticsearch not initialized")
+	}
 	deleteIndex, err := ElasticSearch.DeleteIndex(index).Do(context.Background())
 	if err != nil || !deleteIndex.Acknowledged {
 		return err
@@ -61,6 +72,9 @@ func DeleteIndex(index string) error {
 //	@param index
 //	@return bool
 func IsExistsIndex(index string) bool {
+	if !IsReady() {
+		return false
+	}
 	exists, err := ElasticSearch.IndexExists(index).Do(context.Background())
 	if err != nil {
 		return false
@@ -89,6 +103,9 @@ mappings := `{
 */
 //		@return error
 func CreateMap(index string, mappings string) error {
+	if !IsReady() {
+		return errors.New("elasticsearch not initialized")
+	}
 	do, err := ElasticSearch.PutMapping().Index(index).BodyString(mappings).Do(context.Background())
 	if err != nil || !do.Acknowledged {
 		return err
@@ -113,6 +130,9 @@ data := map[string]interface{}{
 //  @return error
 //
 func InsertData(index string, data map[string]any) error {
+	if !IsReady() {
+		return errors.New("elasticsearch not initialized")
+	}
 	resp, err := ElasticSearch.Index().
 		Index(index).
 		BodyJson(data).
@@ -151,6 +171,9 @@ query := `{
 // @return []*elastic.SearchHit
 // @return error
 func Search(index string, query string) (result []map[string]any, count int64) {
+	if !IsReady() {
+		return nil, 0
+	}
 	searchResult, err := ElasticSearch.Search().
 		Index(index).
 		Source(query).
@@ -173,6 +196,9 @@ func Search(index string, query string) (result []map[string]any, count int64) {
 
 // UpdateByField 根据字段进行更新
 func UpdateByField(index, byField, ByValue, ChField, ChValue string) {
+	if !IsReady() {
+		return
+	}
 	// 构建查询条件
 	termQuery := elastic.NewTermQuery(byField, ByValue)
 	// 执行查询
