@@ -128,6 +128,5 @@ func (w wsHandle) Handler(c *gin.Context) {
 	go t.ReceiveWsMsg(conn, quitChan, key, startTime, record)      // ws > terminal
 	go t.WriteWsMsg(conn, quitChan, esDataChan)                    // terminal > ws & chan
 	go t.WriteEsData(quitChan, key, startTime, record, esDataChan) // chan > es
-	<-quitChan
 	t.SessionWait(quitChan)
 }
