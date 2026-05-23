@@ -11,6 +11,9 @@
         Up
       </el-button>
       <el-input :model-value="currentPath" readonly size="small" />
+      <el-button size="small" type="primary" @click="$emit('upload')">
+        Upload
+      </el-button>
     </div>
     <el-table
       :data="files"
@@ -55,6 +58,7 @@ const props = defineProps<{
 
 defineEmits<{
   'update:visible': [value: boolean]
+  upload: []
 }>()
 
 const files = computed(() => props.fileManager.files.value)
@@ -62,7 +66,7 @@ const loading = computed(() => props.fileManager.loading.value)
 const currentPath = computed(() => props.fileManager.currentPath.value)
 
 function onOpen() {
-  props.fileManager.fetchFiles('/')
+  props.fileManager.fetchFiles('/tmp')
 }
 
 function onRowClick(row: FileItem) {

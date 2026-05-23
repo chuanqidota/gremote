@@ -49,7 +49,7 @@ const emit = defineEmits<{
   uploaded: []
 }>()
 
-const uploadPath = ref('/')
+const uploadPath = ref('/tmp')
 const selectedFile = ref<File | null>(null)
 const fileList = ref<UploadFile[]>([])
 const loading = ref(false)

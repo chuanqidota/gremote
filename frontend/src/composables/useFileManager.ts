@@ -6,7 +6,7 @@ export function useFileManager(key: string) {
   const files = ref<FileItem[]>([])
   const loading = ref(false)
   const error = ref('')
-  const currentPath = ref('/')
+  const currentPath = ref('/tmp')
 
   async function fetchFiles(path: string) {
     loading.value = true
