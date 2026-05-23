@@ -55,6 +55,15 @@ func (w wsHandle) Handler(c *gin.Context) {
 		return
 	}
 
+	// 自动获取客户端真实IP
+	clientIP := c.ClientIP()
+	if info.User == "" {
+		info.User = clientIP
+	}
+	if info.Source == "" {
+		info.Source = clientIP
+	}
+
 	// 登录信息写入到es中
 	e := loginAudit.NewEsAudit()
 	auditData := map[string]any{

@@ -2,24 +2,27 @@
   <div class="terminal-page" :style="pageStyle">
     <div class="terminal-toolbar" :style="toolbarStyle">
       <span class="connection-status" :style="{ color: statusColor }">
-        {{ statusText }}
+        ● {{ statusText }}
+      </span>
+      <span v-if="hostIp" class="host-info" :style="{ color: '#909399' }">
+        {{ hostIp }}
       </span>
       <div class="toolbar-right">
         <el-select
           v-model="currentTheme"
           size="small"
-          style="width: 120px"
+          style="width: 100px"
           @change="applyTheme"
         >
-          <el-option label="Dark" value="dark" />
-          <el-option label="Light" value="light" />
-          <el-option label="Solarized" value="solarized-dark" />
-          <el-option label="Dracula" value="dracula" />
+          <el-option label="暗色" value="dark" />
+          <el-option label="亮色" value="light" />
+          <el-option label="日光" value="solarized-dark" />
+          <el-option label="德古拉" value="dracula" />
         </el-select>
         <el-button size="small" @click="openFileBrowser">
-          Files
+          文件
         </el-button>
-        <el-button size="small" :title="isFullscreen ? 'Exit fullscreen' : 'Fullscreen'" @click="toggleFullscreen">
+        <el-button size="small" :title="isFullscreen ? '退出全屏' : '全屏'" @click="toggleFullscreen">
           <el-icon><FullScreen v-if="!isFullscreen" /><Close v-else /></el-icon>
         </el-button>
       </div>
@@ -27,7 +30,6 @@
     <div ref="termContainer" class="terminal-container" />
     <FileListDialog
       v-model:visible="fileListVisible"
-      :key="dialogKey"
       :file-manager="fileManager"
       @upload="uploadVisible = true"
     />
@@ -94,12 +96,12 @@ const themes: Record<string, { fg: string; bg: string; cursor: string; selection
 
 const route = useRoute()
 const key = route.query.key as string
+const hostIp = route.query.host as string
 const wsHost = import.meta.env.VITE_WS_HOST || window.location.host
 
 const termContainer = ref<HTMLDivElement>()
 const fileListVisible = ref(false)
 const uploadVisible = ref(false)
-const dialogKey = ref(0)
 const currentTheme = ref('dark')
 
 const { status, error, connect, getSocket } = useWebSocket(key)
@@ -119,10 +121,10 @@ const statusColor = computed(() => {
 
 const statusText = computed(() => {
   switch (status.value) {
-    case 'connecting': return 'Connecting...'
-    case 'connected': return 'Connected'
-    case 'disconnected': return 'Disconnected'
-    case 'error': return error.value || 'Error'
+    case 'connecting': return ''
+    case 'connected': return '已连接'
+    case 'disconnected': return '已断开'
+    case 'error': return error.value || '错误'
     default: return ''
   }
 })
@@ -152,7 +154,7 @@ function toggleFullscreen() {
 
 onMounted(() => {
   if (!key) {
-    ElMessage.error('Missing connection key')
+    ElMessage.error('缺少连接密钥')
     return
   }
 
@@ -160,9 +162,9 @@ onMounted(() => {
 
   const socket = connect(wsHost)
 
-  socket.onopen = () => {
+  socket.addEventListener('open', () => {
     nextTick(() => initTerminal(socket))
-  }
+  })
 })
 
 function initTerminal(socket: WebSocket) {
@@ -220,14 +222,8 @@ function openFileBrowser() {
 
 function onFileUploaded() {
   uploadVisible.value = false
-  dialogKey.value++
+  fileManager.fetchFiles(fileManager.currentPath.value)
 }
-
-onBeforeUnmount(() => {
-  document.removeEventListener('fullscreenchange', onFullscreenChange)
-  window.removeEventListener('resize', onResize)
-  term?.dispose()
-})
 </script>
 
 <style scoped>
@@ -242,7 +238,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 6px 14px;
   background: #2d2d2d;
   border-bottom: 1px solid #3d3d3d;
 }
@@ -252,9 +248,13 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
+.host-info {
+  font-size: 11px;
+}
+
 .toolbar-right {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   margin-left: auto;
   align-items: center;
 }

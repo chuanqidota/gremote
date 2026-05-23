@@ -6,7 +6,7 @@ package cmd
 import (
 	"os"
 	"os/signal"
-	"gwebssh/pkg/as3"
+	"gwebssh/pkg/s3"
 
 	"context"
 	"gwebssh/config"
@@ -44,7 +44,7 @@ func init() {
 	logger.Init()
 	redis.Init()
 	es.Init()
-	as3.Init()
+	s3.Init()
 }
 
 func Run() {

@@ -1,18 +1,21 @@
 <template>
   <el-dialog
     :model-value="visible"
-    title="Browse Files"
+    title="文件浏览"
     width="640px"
     @update:model-value="$emit('update:visible', $event)"
     @open="onOpen"
   >
     <div class="file-path-bar">
-      <el-button size="small" @click="goUp" :disabled="currentPath === '/'">
-        Up
-      </el-button>
-      <el-input :model-value="currentPath" readonly size="small" />
+      <el-input
+        v-model="customPath"
+        size="small"
+        placeholder="输入路径，回车跳转"
+        @keyup.enter="navigateToPath"
+      />
+      <el-button size="small" @click="navigateToPath">跳转</el-button>
       <el-button size="small" type="primary" @click="$emit('upload')">
-        Upload
+        上传
       </el-button>
     </div>
     <el-table
@@ -22,14 +25,14 @@
       @row-click="onRowClick"
       style="cursor: pointer"
     >
-      <el-table-column prop="name" label="Name" />
-      <el-table-column prop="size" label="Size" width="120" />
-      <el-table-column prop="type" label="Type" width="100">
+      <el-table-column prop="name" label="名称" />
+      <el-table-column prop="size" label="大小" width="120" />
+      <el-table-column prop="type" label="类型" width="100">
         <template #default="{ row }">
-          {{ row.type === 'directory' ? 'Folder' : 'File' }}
+          {{ row.type === 'directory' ? '文件夹' : '文件' }}
         </template>
       </el-table-column>
-      <el-table-column label="Action" width="100">
+      <el-table-column label="操作" width="100">
         <template #default="{ row }">
           <el-button
             v-if="row.type === 'file'"
@@ -38,7 +41,7 @@
             link
             @click.stop="onDownload(row)"
           >
-            Download
+            下载
           </el-button>
         </template>
       </el-table-column>
@@ -47,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { FileItem } from '../types'
 import type { useFileManager } from '../composables/useFileManager'
 
@@ -64,9 +67,20 @@ defineEmits<{
 const files = computed(() => props.fileManager.files.value)
 const loading = computed(() => props.fileManager.loading.value)
 const currentPath = computed(() => props.fileManager.currentPath.value)
+const customPath = ref(currentPath.value)
+
+watch(currentPath, (val) => {
+  customPath.value = val
+})
 
 function onOpen() {
-  props.fileManager.fetchFiles('/tmp')
+  customPath.value = props.fileManager.currentPath.value || '/tmp'
+  props.fileManager.fetchFiles(customPath.value)
+}
+
+function navigateToPath() {
+  const path = customPath.value.trim() || '/tmp'
+  props.fileManager.fetchFiles(path)
 }
 
 function onRowClick(row: FileItem) {
@@ -74,13 +88,6 @@ function onRowClick(row: FileItem) {
     const sep = currentPath.value.endsWith('/') ? '' : '/'
     props.fileManager.fetchFiles(currentPath.value + sep + row.name)
   }
-}
-
-function goUp() {
-  const parts = currentPath.value.split('/').filter(Boolean)
-  parts.pop()
-  const parent = '/' + parts.join('/')
-  props.fileManager.fetchFiles(parent || '/')
 }
 
 function onDownload(row: FileItem) {

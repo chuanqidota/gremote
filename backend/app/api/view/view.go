@@ -7,7 +7,7 @@ import (
 	"gwebssh/app/api/params"
 	"gwebssh/app/ws/utils/recordAudit"
 	"gwebssh/config"
-	"gwebssh/pkg/as3"
+	"gwebssh/pkg/s3"
 	"gwebssh/pkg/response"
 
 	"strings"
@@ -35,7 +35,7 @@ func (a *apiHandle) ObtainKey(c *gin.Context) {
 	_uuid := uuid.New().String()
 	key := strings.Replace(_uuid, "-", "", -1)
 
-	if err := redis.Set(key, info, 24*60*60*time.Second); err != nil {
+	if err := redis.Set(key, info, time.Duration(config.Conf.Server.SessionTTL)*time.Second); err != nil {
 		response.Fail(c, fmt.Sprintf("redis设置失败-%s", err.Error()))
 		return
 	}
@@ -136,15 +136,13 @@ func (a *apiHandle) LoginAudit(c *gin.Context) {
 	response.Success(c, "执行成功", result)
 }
 
-// RecordUrl 获取 记录的url
+// RecordUrl 获取记录的url
 func (a *apiHandle) RecordUrl(c *gin.Context) {
 	key := c.Query("key")
 	if key == "" {
 		response.Fail(c, "参数错误")
 		return
 	}
-	endpoint := config.Conf.As3.EndPoint
-	bucket := config.Conf.As3.Bucket
 	// 从es中读取数据
 	record := recordAudit.NewEsRecord()
 	result := record.ReadData(key)
@@ -156,9 +154,28 @@ func (a *apiHandle) RecordUrl(c *gin.Context) {
 		buffer.WriteByte('\n')
 	}
 
-	// 上传到as3中-会覆盖更新
-	as3.UploadFile(key, buffer.Bytes())
+	// 上传到S3中-会覆盖更新
+	if err := s3.UploadFile(key, buffer.Bytes()); err != nil {
+		response.Fail(c, fmt.Sprintf("上传录制文件失败-%s", err.Error()))
+		return
+	}
 
-	url := fmt.Sprintf("http://%s/%s/%s", endpoint, bucket, key)
+	url := fmt.Sprintf("/api/v1/record-file?key=%s", key)
 	response.Success(c, "执行成功", url)
+}
+
+// RecordFile 获取录制文件内容
+func (a *apiHandle) RecordFile(c *gin.Context) {
+	key := c.Query("key")
+	if key == "" {
+		response.Fail(c, "参数错误")
+		return
+	}
+	data, err := s3.GetFile(key)
+	if err != nil {
+		response.Fail(c, fmt.Sprintf("读取录制文件失败-%s", err.Error()))
+		return
+	}
+	c.Header("Content-Type", "text/plain; charset=utf-8")
+	c.Data(200, "text/plain; charset=utf-8", data)
 }

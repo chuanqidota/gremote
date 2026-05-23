@@ -8,8 +8,9 @@ import (
 
 type Config struct {
 	Server struct {
-		Ip   string `json:"ip" comment:"服务地址"`
-		Port int    `json:"port" comment:"服务端口"`
+		Ip         string `json:"ip" comment:"服务地址"`
+		Port       int    `json:"port" comment:"服务端口"`
+		SessionTTL int    `json:"sessionTTL" comment:"会话密钥过期时间-秒"`
 	}
 	Redis struct {
 		Addr     string `json:"add" comment:"redis主机地址"`
@@ -25,7 +26,7 @@ type Config struct {
 		LoginAuditIndex  string `json:"login_audit" comment:"登录审计-es索引"`
 		RecordAuditIndex string `json:"record_audit" comment:"操作审计-es索引"`
 	}
-	As3 struct {
+	S3 struct {
 		EndPoint        string `json:"endpoint" comment:"地址"`
 		AccessKeyID     string `json:"accessKeyID" comment:"密钥ID"`
 		SecretAccessKey string `json:"secretAccessKey" comment:"密钥KEY"`

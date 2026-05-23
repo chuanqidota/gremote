@@ -1,20 +1,21 @@
 Server:
   Ip: 0.0.0.0
   Port: 8000
+  SessionTTL: 86400
 Redis:
   Addr: 127.0.0.1:6379
   PassWord: ""
   DB: 0
 ElasticSearch:
-  Url: http://192.168.127.2:9200
+  Url: http://127.0.0.1:9200
   Username: ""
   Password: ""
 Audit:
   LoginAuditIndex: gwebssh-login
   RecordAuditIndex: gwebssh-record
-As3:
+S3:
   EndPoint: 127.0.0.1:9000
-  AccessKeyID: teID3J2ObR41qiIQyYEH
-  SecretAccessKey: j7loHshIjmhM3MmKFnFgRy7xdSHAFesHcFOtmRe9
+  AccessKeyID: L1JigY9oU7lr9GyCQv14
+  SecretAccessKey: 6DoFFEy7t2iuSguyMB80sozKBGjbDGIvT8Tn6HWK
   UseSSL: false
   Bucket: gwebssh
