@@ -1,6 +1,7 @@
 package recordAudit
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 	"webssh-go/config"
@@ -60,31 +61,25 @@ func (e *EsRecord) ReadData(key string) []map[string]any {
 	pageSize := 10000
 	for {
 		from := (pageNum - 1) * pageSize
-		query := `{
-            "query":{
-                "bool":{
-                    "must":[
-                        {
-                            "match":{
-                                "key": "%s"
-                            }
-                        }
-                    ]
-                }
-            },
-            "sort":[
-                {
-                    "timeStamp":{
-                        "order":"asc"
-                    }
-                }
-            ],
-            "from": %d,
-            "size": %d
-        }`
-
-		query = fmt.Sprintf(query, key, from, pageSize)
-		res, _ := es.Search(index, query)
+		query := map[string]any{
+			"query": map[string]any{
+				"bool": map[string]any{
+					"must": []map[string]any{
+						{"match": map[string]string{"key": key}},
+					},
+				},
+			},
+			"sort": []map[string]any{
+				{"timeStamp": map[string]string{"order": "asc"}},
+			},
+			"from": from,
+			"size": pageSize,
+		}
+		queryB, err := json.Marshal(query)
+		if err != nil {
+			return result
+		}
+		res, _ := es.Search(index, string(queryB))
 		if len(res) == 0 {
 			break
 		}

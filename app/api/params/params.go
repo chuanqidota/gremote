@@ -4,7 +4,7 @@ package params
 type Info struct {
 	User     string `json:"user" comment:"用户"`
 	Source   string `json:"source" comment:"源地址"`
-	Target   string `json:"" comment:"目标地址" binding:"required"`
+	Target   string `json:"target" comment:"目标地址" binding:"required"`
 	Username string `json:"username" comment:"主机用户名" binding:"required"`
 	Password string `json:"password" comment:"主机密码" binding:"required"`
 	Port     int    `json:"port" comment:"端口" binding:"required"`
