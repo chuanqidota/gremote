@@ -67,7 +67,6 @@ function initTerminal(socket: WebSocket) {
   if (!termContainer.value) return
 
   term = new Terminal({
-    rendererType: 'canvas',
     fontSize: 14,
     cursorBlink: true,
     disableStdin: false,
