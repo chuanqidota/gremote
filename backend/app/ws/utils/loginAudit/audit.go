@@ -145,6 +145,13 @@ func (e *EsAudit) ReadData(data params.LoginAuditQuery) ([]map[string]any, int64
 		},
 		"from": offset,
 		"size": limit,
+		"sort": []map[string]any{
+			{
+				"startTime": map[string]string{
+					"order": "desc",
+				},
+			},
+		},
 	}
 	queryB, ok := json.Marshal(query)
 	if ok != nil {
