@@ -106,7 +106,6 @@ func (t *Terminal) Close() {
 
 // ReceiveWsMsg 接受ws消息 发送到terminal
 func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool, key string, startTime time.Time, record *recordAudit.EsRecord) {
-	defer setQuit(quitChan)
 	for {
 		select {
 		case <-quitChan:
@@ -153,7 +152,6 @@ func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool, key stri
 
 // WriteWsMsg 读取终端输出往ws中写消息
 func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool, esDataChan chan []byte) {
-	defer setQuit(quitChan)
 	for {
 		select {
 		case <-quitChan:
@@ -179,7 +177,6 @@ func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool, esDataChan
 
 // WriteEsData 写入到数据到es中
 func (t *Terminal) WriteEsData(quitChan chan bool, key string, startTime time.Time, record *recordAudit.EsRecord, esDataChan chan []byte) {
-	defer setQuit(quitChan)
 	for {
 		select {
 		case <-quitChan:
