@@ -1,8 +1,8 @@
 package router
 
 import (
-	api_view "gwebssh/app/api/view"
-	ws_view "gwebssh/app/ws/view"
+	apiview "gwebssh/app/api/view"
+	wsview "gwebssh/app/ws/view"
 	"gwebssh/pkg/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -13,18 +13,18 @@ func Engine() *gin.Engine {
 
 	api := router.Group("api/v1").Use(middleware.CORSMiddleware())
 	{
-		api.POST("obtain-key", api_view.ApiHandle.ObtainKey)
-		api.GET("list-file", api_view.ApiHandle.ListFile)
-		api.POST("upload-file", api_view.ApiHandle.UploadFile)
-		api.GET("download-file", api_view.ApiHandle.DownLoadFile)
-		api.GET("login-audit", api_view.ApiHandle.LoginAudit)
-		api.GET("record-url", api_view.ApiHandle.RecordUrl)
-		api.GET("record-file", api_view.ApiHandle.RecordFile)
+		api.POST("obtain-key", apiview.ApiHandle.ObtainKey)
+		api.GET("list-file", apiview.ApiHandle.ListFile)
+		api.POST("upload-file", apiview.ApiHandle.UploadFile)
+		api.GET("download-file", apiview.ApiHandle.DownLoadFile)
+		api.GET("login-audit", apiview.ApiHandle.LoginAudit)
+		api.GET("record-url", apiview.ApiHandle.RecordUrl)
+		api.GET("record-file", apiview.ApiHandle.RecordFile)
 	}
 
 	ws := router.Group("ws/v1").Use(middleware.CORSMiddleware())
 	{
-		ws.GET(":key", ws_view.WsHandle.Handler)
+		ws.GET(":key", wsview.WsHandle.Handler)
 	}
 
 	return router

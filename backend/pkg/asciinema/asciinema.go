@@ -2,7 +2,6 @@ package asciinema
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 	"gwebssh/app/ws/utils/recordAudit"
 )
@@ -51,14 +50,3 @@ func WriteData(key string, startTime time.Time, out string, record *recordAudit.
 	record.WriteData(data)
 }
 
-// WriteSize 写尺寸数据
-func WriteSize(key string, startTime time.Time, cols, rows int, record *recordAudit.EsRecord) {
-	sub := float64(time.Since(startTime).Microseconds()) / float64(1000000)
-	history, _ := json.Marshal([]any{sub, "r", fmt.Sprintf("%d*%d", cols, rows)})
-	data := map[string]any{
-		"key":       key,
-		"timeStamp": time.Now().UnixNano() / int64(time.Millisecond),
-		"history":   string(history),
-	}
-	record.WriteData(data)
-}

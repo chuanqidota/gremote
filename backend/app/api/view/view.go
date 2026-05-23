@@ -57,7 +57,6 @@ func (a *apiHandle) ListFile(c *gin.Context) {
 		response.Fail(c, fmt.Sprintf("没有登录信息-%s", err.Error()))
 		return
 	}
-	fmt.Println(info)
 	result, err := file.FileHandle.ListFile(info, listFileBody.Path)
 	if err != nil {
 		response.Fail(c, err.Error())

@@ -35,11 +35,11 @@ func Init() {
 
 // Set 设置指定键
 func Set(key string, value any, expiration time.Duration) error {
-	value_, err := json.Marshal(value)
+	data, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
-	if err := RedisClient.Set(context.Background(), key, value_, expiration).Err(); err != nil {
+	if err := RedisClient.Set(context.Background(), key, data, expiration).Err(); err != nil {
 		return err
 	} else {
 		return nil
@@ -60,20 +60,6 @@ func DeleteKey(key string) {
 	isConnectedKey := key+"_connected"
 	RedisClient.Del(context.Background(), key)
 	RedisClient.Del(context.Background(),isConnectedKey)
-}
-
-// Exist 判断key存不存在
-func Exist(key string) bool {
-	exists, err := RedisClient.Exists(context.Background(), key).Result()
-	if err != nil {
-		logger.Error(fmt.Sprintf("获取redis中的key错误-%s", err.Error()))
-		return false
-	}
-	if exists == 0 {
-		return false
-	} else {
-		return true
-	}
 }
 
 // IsConnected 判断有没有连接过

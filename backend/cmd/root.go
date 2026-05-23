@@ -1,6 +1,3 @@
-/*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
@@ -41,6 +38,10 @@ func Execute() {
 
 func init() {
 	config.Init()
+	if err := config.Validate(); err != nil {
+		logger.Error(fmt.Sprintf("配置校验失败: %s", err.Error()))
+		os.Exit(1)
+	}
 	logger.Init()
 	redis.Init()
 	es.Init()
@@ -48,7 +49,7 @@ func init() {
 }
 
 func Run() {
-	addr := fmt.Sprintf("%s:%d", config.Conf.Server.Ip, config.Conf.Server.Port)
+	addr := fmt.Sprintf("%s:%d", config.Conf.Server.Host, config.Conf.Server.Port)
 	server := &http.Server{
 		Addr:           addr,
 		Handler:        router.Engine(),
@@ -66,10 +67,10 @@ func Run() {
 		defer cancel()
 
 		if err := server.Shutdown(ctx); err != nil {
-			fmt.Println(err.Error())
+			logger.Error(fmt.Sprintf("服务关闭失败: %s", err.Error()))
 		}
 	}()
 	if err := server.ListenAndServe(); err != nil {
-		fmt.Println(err.Error())
+		logger.Error(fmt.Sprintf("服务启动失败: %s", err.Error()))
 	}
 }

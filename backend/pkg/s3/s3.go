@@ -14,7 +14,7 @@ import (
 var S3Client *minio.Client
 
 func Init() {
-	endpoint := config.Conf.S3.EndPoint
+	endpoint := config.Conf.S3.Endpoint
 	accessKeyID := config.Conf.S3.AccessKeyID
 	secretAccessKey := config.Conf.S3.SecretAccessKey
 	useSSL := config.Conf.S3.UseSSL
@@ -38,8 +38,8 @@ func UploadFile(key string, data []byte) error {
 		logger.Error(err.Error())
 		return err
 	}
-	BucketName := config.Conf.S3.Bucket
-	_, err := S3Client.PutObject(context.Background(), BucketName, key, bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{})
+	bucketName := config.Conf.S3.Bucket
+	_, err := S3Client.PutObject(context.Background(), bucketName, key, bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{})
 	if err != nil {
 		logger.Error(fmt.Sprintf("上传S3文件失败-%s", err.Error()))
 		return err
@@ -52,8 +52,8 @@ func GetFile(key string) ([]byte, error) {
 	if S3Client == nil {
 		return nil, fmt.Errorf("S3客户端未初始化")
 	}
-	BucketName := config.Conf.S3.Bucket
-	obj, err := S3Client.GetObject(context.Background(), BucketName, key, minio.GetObjectOptions{})
+	bucketName := config.Conf.S3.Bucket
+	obj, err := S3Client.GetObject(context.Background(), bucketName, key, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("读取S3文件失败-%s", err.Error())
 	}
