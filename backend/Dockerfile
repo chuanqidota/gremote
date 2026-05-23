@@ -11,9 +11,10 @@ RUN go build -o webssh main.go
 
 FROM alpine:3
 RUN mkdir -p /opt
-WORKDIR /root/data
+WORKDIR /opt
 COPY --from=builder /opt/webssh /opt/webssh
-RUN chmod +x webssh
-EXPOSE 8080
+COPY --from=builder /opt/config /opt/config
+RUN chmod +x /opt/webssh
+EXPOSE 8000
 
-ENTRYPOINT ["./webssh"]
+ENTRYPOINT ["/opt/webssh"]
