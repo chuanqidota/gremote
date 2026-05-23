@@ -19,8 +19,8 @@
         <el-button size="small" @click="openFileBrowser">
           Files
         </el-button>
-        <el-button size="small" @click="toggleFullscreen">
-          {{ isFullscreen ? 'Exit' : 'Maximize' }}
+        <el-button size="small" :title="isFullscreen ? 'Exit fullscreen' : 'Fullscreen'" @click="toggleFullscreen">
+          <el-icon><FullScreen v-if="!isFullscreen" /><Close v-else /></el-icon>
         </el-button>
       </div>
     </div>
@@ -49,6 +49,7 @@ import { AttachAddon } from 'xterm-addon-attach'
 import 'xterm/css/xterm.css'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useFileManager } from '../composables/useFileManager'
+import { FullScreen, Close } from '@element-plus/icons-vue'
 import FileListDialog from '../components/FileListDialog.vue'
 import FileUploadDialog from '../components/FileUploadDialog.vue'
 
