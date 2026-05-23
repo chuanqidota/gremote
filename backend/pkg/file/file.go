@@ -21,8 +21,14 @@ type fileHandle struct {
 
 var FileHandle = new(fileHandle)
 
+// cleanPath 规范化远程文件路径，防止路径穿越
+func cleanPath(path string) string {
+	return filepath.Clean("/" + path)
+}
+
 // ListFile 查看文件列表
 func (f *fileHandle) ListFile(info params.Info, path string) ([]map[string]any, error) {
+	path = cleanPath(path)
 	// 使用切片嵌套的map来存储目录和文件的大小和名称
 	result := make([]map[string]interface{}, 0)
 
@@ -77,6 +83,7 @@ func (f *fileHandle) ListFile(info params.Info, path string) ([]map[string]any, 
 
 // UploadFile 上传文件
 func (f *fileHandle) UploadFile(file *multipart.FileHeader, info params.Info, path string) error {
+	path = cleanPath(path)
 	// 初始化登录信息
 	target := info.Target
 	username := info.Username
@@ -126,6 +133,7 @@ func (f *fileHandle) UploadFile(file *multipart.FileHeader, info params.Info, pa
 
 // DownLoadFile 下载文件
 func (f *fileHandle) DownLoadFile(info params.Info, path string, filename string) ([]byte, error) {
+	path = cleanPath(path)
 	target := info.Target
 	username := info.Username
 	password := info.Password

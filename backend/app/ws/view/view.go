@@ -66,6 +66,7 @@ func (w wsHandle) Handler(c *gin.Context) {
 
 	// 登录信息写入到es中
 	e := loginAudit.NewEsAudit()
+	defer redis.DeleteKey(key)
 	auditData := map[string]any{
 		"key":       key,
 		"startTime": time.Now().Format("2006-01-02 15:04:05"),
@@ -84,8 +85,13 @@ func (w wsHandle) Handler(c *gin.Context) {
 		_ = conn.WriteMessage(websocket.TextMessage, []byte("接收窗口大小失败"))
 		return
 	}
-	cols := firstData["resize"][0]
-	rows := firstData["resize"][1]
+	resizeData, ok := firstData["resize"]
+	if !ok || len(resizeData) < 2 {
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("窗口大小数据格式错误"))
+		return
+	}
+	cols := resizeData[0]
+	rows := resizeData[1]
 
 	// 连接耗时-增加友好提示
 	_ = conn.WriteMessage(websocket.TextMessage, []byte("终端正在连接中,请稍等..."))
@@ -117,15 +123,11 @@ func (w wsHandle) Handler(c *gin.Context) {
 	// 核心交互
 	quitChan := make(chan bool, 4)
 	defer close(quitChan)
-	esDataChan := make(chan []byte, 1024*1024*1024)
+	esDataChan := make(chan []byte, 1024)
 	defer close(esDataChan)
 	go t.ReceiveWsMsg(conn, quitChan, key, startTime, record)      // ws > terminal
 	go t.WriteWsMsg(conn, quitChan, esDataChan)                    // terminal > ws & chan
 	go t.WriteEsData(quitChan, key, startTime, record, esDataChan) // chan > es
 	<-quitChan
-	t.SessionWait(quitChan) // 最后关闭session 这里执行exit-然后关闭页面。修改别的有报错
-	// 获取成功以后删除redis中的key
-	redis.DeleteKey(key)
-
-	time.Sleep(2 * time.Second)
+	t.SessionWait(quitChan)
 }

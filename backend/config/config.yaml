@@ -2,6 +2,7 @@ Server:
   Ip: 0.0.0.0
   Port: 8000
   SessionTTL: 86400
+  InsecureSkipVerify: true
 Redis:
   Addr: 127.0.0.1:6379
   PassWord: ""

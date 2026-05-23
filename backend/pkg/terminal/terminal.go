@@ -21,7 +21,7 @@ func Client(username, password, target string, port int) (*ssh.Client, error) {
 		Auth: []ssh.AuthMethod{
 			ssh.Password(password),
 		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: 当 InsecureSkipVerify=false 时改为 known_hosts 验证
 		Timeout:         30 * time.Second,
 		Config: ssh.Config{
 			// 默认加密方式 aes128-ctr aes192-ctr aes256-ctr aes128-gcm@openssh.com arcfour256 arcfour128
@@ -56,6 +56,7 @@ type Terminal struct {
 	Session     *ssh.Session
 	StdinPipe   io.WriteCloser
 	ComboOutput *wsBufferWriter
+	wsMu        sync.Mutex // 保护 WebSocket 写操作
 }
 
 // NewTerminal 初始化终端
@@ -97,8 +98,9 @@ func NewTerminal(client *ssh.Client, cols, rows int) (*Terminal, error) {
 // Close 关闭终端
 func (t *Terminal) Close() {
 	if t.Session != nil {
-		err := t.Session.Close()
-		logger.Error("session关闭失败-%s", err.Error())
+		if err := t.Session.Close(); err != nil {
+			logger.Error("session关闭失败-%s", err.Error())
+		}
 	}
 }
 
@@ -113,7 +115,9 @@ func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool, key stri
 			// 接受ws消息
 			_, message, err := ws.ReadMessage()
 			if err != nil {
+				t.wsMu.Lock()
 				_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("读取信息出错-%s", err.Error())))
+				t.wsMu.Unlock()
 				return
 			}
 			// 解析ws消息
@@ -124,12 +128,21 @@ func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool, key stri
 			} else {
 				resize, resizeOk := data["resize"]
 				if resizeOk {
-					resize_, _ := resize.([]any)
-					cols := int(resize_[0].(float64))
-					rows := int(resize_[1].(float64))
-					err = t.Session.WindowChange(cols, rows)
-					if err != nil {
+					resizeArr, arrOk := resize.([]any)
+					if !arrOk || len(resizeArr) < 2 {
+						continue
+					}
+					colsFloat, ok1 := resizeArr[0].(float64)
+					rowsFloat, ok2 := resizeArr[1].(float64)
+					if !ok1 || !ok2 {
+						continue
+					}
+					cols := int(colsFloat)
+					rows := int(rowsFloat)
+					if err = t.Session.WindowChange(cols, rows); err != nil {
+						t.wsMu.Lock()
 						_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("调整窗口大小出错-%s", err.Error())))
+						t.wsMu.Unlock()
 						return
 					}
 				}
@@ -146,14 +159,20 @@ func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool, esDataChan
 		case <-quitChan:
 			return
 		default:
-			if t.ComboOutput.buffer.Len() != 0 {
-				// 往ws中输出
-				_ = ws.WriteMessage(websocket.TextMessage, t.ComboOutput.buffer.Bytes())
-				// 把操作记录写到es中
-				esDataChan <- t.ComboOutput.buffer.Bytes()
-				// 重置ComboOutput的缓冲区
-				t.ComboOutput.buffer.Reset()
+			t.ComboOutput.mu.Lock()
+			if t.ComboOutput.buffer.Len() == 0 {
+				t.ComboOutput.mu.Unlock()
+				continue
 			}
+			data := make([]byte, t.ComboOutput.buffer.Len())
+			copy(data, t.ComboOutput.buffer.Bytes())
+			t.ComboOutput.buffer.Reset()
+			t.ComboOutput.mu.Unlock()
+
+			t.wsMu.Lock()
+			_ = ws.WriteMessage(websocket.TextMessage, data)
+			t.wsMu.Unlock()
+			esDataChan <- data
 		}
 	}
 }
@@ -186,5 +205,8 @@ func (t *Terminal) SessionWait(quitChan chan bool) {
 }
 
 func setQuit(ch chan bool) {
-	ch <- true
+	select {
+	case ch <- true:
+	default:
+	}
 }

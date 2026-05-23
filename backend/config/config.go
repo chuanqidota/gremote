@@ -8,9 +8,10 @@ import (
 
 type Config struct {
 	Server struct {
-		Ip         string `json:"ip" comment:"服务地址"`
-		Port       int    `json:"port" comment:"服务端口"`
-		SessionTTL int    `json:"sessionTTL" comment:"会话密钥过期时间-秒"`
+		Ip                 string `json:"ip" comment:"服务地址"`
+		Port               int    `json:"port" comment:"服务端口"`
+		SessionTTL         int    `json:"sessionTTL" comment:"会话密钥过期时间-秒"`
+		InsecureSkipVerify bool   `json:"insecureSkipVerify" comment:"跳过SSH主机密钥验证"`
 	}
 	Redis struct {
 		Addr     string `json:"add" comment:"redis主机地址"`
