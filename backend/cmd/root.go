@@ -1,9 +1,9 @@
 package cmd
 
 import (
+	"gwebssh/pkg/s3"
 	"os"
 	"os/signal"
-	"gwebssh/pkg/s3"
 
 	"context"
 	"gwebssh/config"
@@ -38,10 +38,6 @@ func Execute() {
 
 func init() {
 	config.Init()
-	if err := config.Validate(); err != nil {
-		logger.Error(fmt.Sprintf("配置校验失败: %s", err.Error()))
-		os.Exit(1)
-	}
 	logger.Init()
 	redis.Init()
 	es.Init()
@@ -67,10 +63,10 @@ func Run() {
 		defer cancel()
 
 		if err := server.Shutdown(ctx); err != nil {
-			logger.Error(fmt.Sprintf("服务关闭失败: %s", err.Error()))
+			fmt.Println(err.Error())
 		}
 	}()
 	if err := server.ListenAndServe(); err != nil {
-		logger.Error(fmt.Sprintf("服务启动失败: %s", err.Error()))
+		fmt.Println(err.Error())
 	}
 }
