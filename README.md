@@ -61,13 +61,13 @@ cp .env.example .env
 #### 第三步：启动基础设施
 
 ```bash
-docker-compose up -d minio redis elasticsearch
+docker compose up -d minio redis elasticsearch
 ```
 
 启动后等待所有容器就绪（约 10-30 秒），可用以下命令检查：
 
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 #### 第四步：配置 MinIO
@@ -92,7 +92,7 @@ MINIO_BUCKET=gwebssh
 #### 第六步：启动应用
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 #### 第七步：访问
@@ -105,19 +105,19 @@ docker-compose up -d
 
 ```bash
 # 查看所有容器状态
-docker-compose ps
+docker compose ps
 
 # 查看后端日志
-docker-compose logs -f backend
+docker compose logs -f backend
 
 # 重启后端（修改配置后）
-docker-compose up -d --build backend
+docker compose up -d --build backend
 
 # 停止所有服务
-docker-compose down
+docker compose down
 
 # 停止并删除数据卷（清空数据）
-docker-compose down -v
+docker compose down -v
 ```
 
 ### 手动部署
