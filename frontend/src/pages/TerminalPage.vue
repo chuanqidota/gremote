@@ -189,6 +189,22 @@ function initTerminal(socket: WebSocket) {
   fitAddon.fit()
   term.focus()
 
+  // 本地回显：ECHO=0 时由 xterm.js 自行显示输入字符
+  term.onData((data) => {
+    if (!term) return
+    for (const char of data) {
+      if (char === '\r' || char === '\n') {
+        term.write('\r\n')
+      } else if (char === '\x7f') {
+        // Backspace: 删除前一个字符
+        term.write('\b \b')
+      } else if (char >= ' ') {
+        // 可打印字符：直接显示
+        term.write(char)
+      }
+    }
+  })
+
   socket.send(JSON.stringify({ resize: [term.cols, term.rows] }))
 
   window.addEventListener('resize', onResize)
