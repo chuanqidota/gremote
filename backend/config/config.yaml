@@ -20,3 +20,7 @@ S3:
   SecretAccessKey: 6DoFFEy7t2iuSguyMB80sozKBGjbDGIvT8Tn6HWK
   UseSSL: false
   Bucket: gwebssh
+
+guacd:
+  host: guacd
+  port: 4822

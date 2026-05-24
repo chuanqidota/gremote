@@ -38,12 +38,18 @@ type S3Config struct {
 	Bucket          string `yaml:"Bucket" comment:"桶名"`
 }
 
+type GuacdConfig struct {
+	Host string `yaml:"host" comment:"guacd主机地址"`
+	Port int    `yaml:"port" comment:"guacd端口"`
+}
+
 type Config struct {
 	Server        ServerConfig `yaml:"Server"`
 	Redis         RedisConfig  `yaml:"Redis"`
 	ElasticSearch ESConfig     `yaml:"ElasticSearch"`
 	Audit         AuditConfig  `yaml:"Audit"`
 	S3            S3Config     `yaml:"S3"`
+	Guacd         GuacdConfig  `yaml:"guacd"`
 }
 
 var Conf = new(Config)

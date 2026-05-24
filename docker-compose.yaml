@@ -10,6 +10,12 @@ services:
       timeout: 5s
       retries: 3
 
+  guacd:
+    image: guacamole/guacd
+    restart: always
+    ports:
+      - "4822:4822"
+
   elasticsearch:
     image: docker.1ms.run/library/elasticsearch:8.17.10
     restart: always
