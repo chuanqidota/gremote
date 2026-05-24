@@ -1,4 +1,4 @@
-FROM golang:1.21.6 AS builder
+FROM docker.1ms.run/library/golang:1.25.10 AS builder
 
 ENV CGO_ENABLED=0 \
     GOOS=linux \
