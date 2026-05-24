@@ -39,19 +39,86 @@
 
 ### Docker 部署（推荐）
 
+#### 前置条件
+
+- Docker 和 Docker Compose 已安装
+
+#### 第一步：克隆项目
+
 ```bash
-# 克隆项目
 git clone https://github.com/chuanqidota/gwebssh.git
 cd gwebssh
-
-# 启动全部服务
-docker-compose up -d
-
-# 访问
-open http://localhost
 ```
 
-> 启动后会自动拉起 Redis、Elasticsearch、MinIO、Backend、Frontend 共 5 个容器。
+#### 第二步：创建环境配置文件
+
+```bash
+cp .env.example .env
+```
+
+`.env` 文件包含所有服务的配置，默认值可直接使用，后续可根据需要修改。
+
+#### 第三步：启动基础设施
+
+```bash
+docker-compose up -d minio redis elasticsearch
+```
+
+启动后等待所有容器就绪（约 10-30 秒），可用以下命令检查：
+
+```bash
+docker-compose ps
+```
+
+#### 第四步：配置 MinIO
+
+1. 打开 MinIO 控制台：http://localhost:9001
+2. 使用默认账号登录：`minioadmin` / `minioadmin`
+3. 点击 **Access Keys** → **Create Access Key**，记录 AccessKey 和 SecretKey
+4. 点击 **Buckets** → **Create Bucket**，名称填写 `gwebssh`
+
+#### 第五步：填写 MinIO 凭证到 .env
+
+将第四步获取的 AccessKey 和 SecretKey 填入 `.env`：
+
+```bash
+MINIO_ACCESS_KEY=你的AccessKey
+MINIO_SECRET_KEY=你的SecretKey
+MINIO_BUCKET=gwebssh
+```
+
+> 如果使用 MinIO 默认的 `minioadmin/minioadmin`，可跳过此步。
+
+#### 第六步：启动应用
+
+```bash
+docker-compose up -d
+```
+
+#### 第七步：访问
+
+- 前端页面：http://localhost
+- MinIO 控制台：http://localhost:9001
+- Elasticsearch：http://localhost:9200
+
+#### 常用命令
+
+```bash
+# 查看所有容器状态
+docker-compose ps
+
+# 查看后端日志
+docker-compose logs -f backend
+
+# 重启后端（修改配置后）
+docker-compose up -d --build backend
+
+# 停止所有服务
+docker-compose down
+
+# 停止并删除数据卷（清空数据）
+docker-compose down -v
+```
 
 ### 手动部署
 
@@ -85,37 +152,56 @@ npm run build
 
 ---
 
-## 配置说明
+## 部署配置
+
+### 本地开发
 
 配置文件：`backend/config/config.yaml`
 
 ```yaml
 Server:
-  Ip: 0.0.0.0          # 服务监听地址
-  Port: 8000            # 服务端口
-  SessionTTL: 86400     # 会话密钥过期时间（秒），默认24小时
+  Host: 0.0.0.0              # 服务监听地址
+  Port: 8000                 # 服务端口
+  SessionTTL: 86400          # 会话密钥过期时间（秒），默认24小时
+  InsecureSkipVerify: true   # 跳过SSH主机密钥验证
 
 Redis:
-  Addr: 127.0.0.1:6379  # Redis 地址
-  Password: ""           # Redis 密码
-  DB: 0                  # Redis 数据库编号
+  Addr: 127.0.0.1:6379       # Redis 地址
+  Password: ""               # Redis 密码
+  DB: 0                      # Redis 数据库编号
 
 ElasticSearch:
-  Url: http://127.0.0.1:9200  # ES 地址
-  Username: ""                 # ES 用户名
-  Password: ""                 # ES 密码
+  Url: http://127.0.0.1:9200 # ES 地址
+  Username: ""               # ES 用户名
+  Password: ""               # ES 密码
 
 Audit:
   LoginAuditIndex: gwebssh-login   # 登录审计索引前缀
   RecordAuditIndex: gwebssh-record # 操作审计索引前缀
 
 S3:
-  EndPoint: 127.0.0.1:9000    # MinIO 地址
-  AccessKeyID: xxx             # MinIO AccessKey
-  SecretAccessKey: xxx         # MinIO SecretKey
-  UseSSL: false                # 是否使用 HTTPS
-  Bucket: gwebssh              # 桶名
+  Endpoint: 127.0.0.1:9000   # MinIO 地址
+  AccessKeyID: xxx            # MinIO AccessKey
+  SecretAccessKey: xxx        # MinIO SecretKey
+  UseSSL: false               # 是否使用 HTTPS
+  Bucket: gwebssh             # 桶名
 ```
+
+### Docker 部署
+
+Docker 部署通过 `.env` 文件管理配置，环境变量会覆盖 `config.yaml` 中的值：
+
+| 环境变量 | 说明 | 默认值 |
+|---------|------|--------|
+| `GWEBSSH_SERVER_PORT` | 服务端口 | 8000 |
+| `GWEBSSH_REDIS_ADDR` | Redis 地址 | redis:6379 |
+| `GWEBSSH_ELASTICSEARCH_URL` | ES 地址 | http://elasticsearch:9200 |
+| `GWEBSSH_S3_ENDPOINT` | MinIO 地址 | minio:9000 |
+| `GWEBSSH_S3_ACCESSKEYID` | MinIO AccessKey | minioadmin |
+| `GWEBSSH_S3_SECRETACCESSKEY` | MinIO SecretKey | minioadmin |
+| `GWEBSSH_S3_BUCKET` | 桶名 | gwebssh |
+
+> 配置优先级：环境变量 > config.yaml
 
 ---
 
