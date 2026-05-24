@@ -29,5 +29,6 @@ go.work
 
 node_modules/
 dist/
+.env
 
 *.log
