@@ -20,18 +20,17 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { FullScreen, Close } from '@element-plus/icons-vue'
-import { useRdpWebSocket } from '../composables/useRdpWebSocket'
 import Guacamole from 'guacamole-common-js'
 
 const route = useRoute()
 const key = route.query.key as string
 const hostIp = route.query.host as string
-const wsHost = import.meta.env.VITE_WS_HOST || window.location.host
 
 const displayContainer = ref<HTMLDivElement>()
 const isFullscreen = ref(false)
 
-const { status, error, connect } = useRdpWebSocket(key)
+const status = ref<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting')
+const error = ref('')
 
 const statusColor = computed(() => {
   switch (status.value) {
@@ -53,6 +52,55 @@ const statusText = computed(() => {
 })
 
 let guacClient: any = null
+let tunnel: Guacamole.WebSocketTunnel | null = null
+let syncCount = 0
+let imgDecoded = 0
+let imgDrawn = 0
+const instrCounts: Record<string, number> = {}
+
+// Diagnostic: monkey-patch createImageBitmap to track image decoding + fallback on failure
+let imgFailed = 0
+const _origCreateImageBitmap = window.createImageBitmap
+if (_origCreateImageBitmap) {
+	window.createImageBitmap = function(blob: any, opts?: any) {
+		imgDecoded++
+		const tag = imgDecoded
+		console.log(`[RDP] createImageBitmap #${tag}: blob size=${blob?.size}, type=${blob?.type}`)
+		const promise = (_origCreateImageBitmap as any).call(window, blob, opts) as Promise<ImageBitmap>
+		promise.then(
+			(bitmap: ImageBitmap) => {
+				console.log(`[RDP] createImageBitmap #${tag}: SUCCESS ${bitmap.width}x${bitmap.height}`)
+			},
+			(err: any) => {
+				imgFailed++
+				console.error(`[RDP] createImageBitmap #${tag}: FAILED`, err?.message || err,
+					`blob size=${blob?.size} type=${blob?.type}`)
+			}
+		)
+		// Chain .catch() fallback: if decode fails, create 1x1 transparent bitmap
+		// so task.unblock() still fires and subsequent frames aren't blocked
+		return promise.catch(async (err: any) => {
+			imgFailed++
+			console.error(`[RDP] createImageBitmap #${tag}: FALLBACK`, err?.message || err)
+			const c = document.createElement('canvas')
+			c.width = 1; c.height = 1
+			return (_origCreateImageBitmap as any).call(window, c) as Promise<ImageBitmap>
+		})
+	}
+}
+
+// Diagnostic: intercept Canvas drawImage to track actual pixel rendering
+const _origDrawImage = CanvasRenderingContext2D.prototype.drawImage
+let _drawLogCount = 0
+CanvasRenderingContext2D.prototype.drawImage = function(...args: any[]) {
+	if (_drawLogCount < 5) {
+		_drawLogCount++
+		const img = args[0] as any
+		console.log(`[RDP] canvas.drawImage #${_drawLogCount}: img=${img.constructor?.name || typeof img} ${img.width}x${img.height} at (${args[1]},${args[2]}), canvas=${(this as any).canvas?.width}x${(this as any).canvas?.height}`)
+	}
+	imgDrawn++
+	return _origDrawImage.apply(this, args as any)
+}
 
 function onFullscreenChange() {
   isFullscreen.value = !!document.fullscreenElement
@@ -74,54 +122,162 @@ onMounted(() => {
 
   document.addEventListener('fullscreenchange', onFullscreenChange)
 
-  const socket = connect(wsHost)
+  // Build WebSocket URL
+  const backendHost = import.meta.env.VITE_API_HOST || 'localhost:8000'
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const wsUrl = `${protocol}//${backendHost}/ws/v1/rdp/${key}`
 
-  socket.addEventListener('open', () => {
-    // Create a tunnel that adapts our JSON WebSocket to Guacamole protocol format
-    const tunnel = new Guacamole.WebSocketTunnel(socket as any)
+  // Create Guacamole tunnel, client, and display
+  tunnel = new Guacamole.WebSocketTunnel(wsUrl)
+  guacClient = new Guacamole.Client(tunnel)
 
-    // Create Guacamole client with the tunnel
-    guacClient = new Guacamole.Client(tunnel)
+  // Attach display element to DOM
+  const displayEl = guacClient.getDisplay().getElement()
+  displayContainer.value!.appendChild(displayEl)
 
-    // Get display element
-    const display = guacClient.getDisplay().getElement()
-    displayContainer.value!.appendChild(display)
+  // Mouse input
+  const mouse = new Guacamole.Mouse(displayEl)
+  mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = (mouseState: any) => {
+    guacClient.sendMouseState(mouseState)
+  }
 
-    // Mouse input
-    const mouse = new Guacamole.Mouse(display)
-    mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = (mouseState: any) => {
-      guacClient.sendMouseState(mouseState)
+  // Keyboard input
+  const keyboard = new Guacamole.Keyboard(document)
+  keyboard.onkeydown = (keysym: number) => {
+    guacClient.sendKeyEvent(1, keysym)
+  }
+  keyboard.onkeyup = (keysym: number) => {
+    guacClient.sendKeyEvent(0, keysym)
+  }
+
+  // Tunnel event handlers (set before connect so Client.connect()
+  // can wrap them without interference from our logging)
+  tunnel.onerror = (errorMsg: any) => {
+    console.error('[RDP] Tunnel error:', errorMsg)
+    status.value = 'error'
+    error.value = (errorMsg && errorMsg.message) || '连接失败'
+    ElMessage.error(error.value)
+  }
+
+  tunnel.onstatechange = (tunnelState: number) => {
+    const stateNames: Record<number, string> = {
+      [Guacamole.Tunnel.State.CONNECTING]: 'CONNECTING',
+      [Guacamole.Tunnel.State.OPEN]: 'OPEN',
+      [Guacamole.Tunnel.State.CLOSED]: 'CLOSED',
     }
-
-    // Keyboard input
-    const keyboard = new Guacamole.Keyboard(document)
-    keyboard.onkeydown = (keysym: number) => {
-      guacClient.sendKeyEvent(1, keysym)
+    console.log('[RDP] Tunnel state:', tunnelState, stateNames[tunnelState] || 'UNKNOWN')
+    switch (tunnelState) {
+      case Guacamole.Tunnel.State.OPEN:
+        status.value = 'connected'
+        break
+      case Guacamole.Tunnel.State.CLOSED:
+        status.value = 'disconnected'
+        break
+      case Guacamole.Tunnel.State.CONNECTING:
+        status.value = 'connecting'
+        break
     }
-    keyboard.onkeyup = (keysym: number) => {
-      guacClient.sendKeyEvent(0, keysym)
+  }
+
+  // Connect — Client.connect() sets up its own oninstruction handler
+  guacClient.connect('')
+
+  // Diagnostic: watch display resize
+  const display = guacClient.getDisplay()
+  display.onresize = (width: number, height: number) => {
+    console.log('[RDP] Display resized to:', width, 'x', height)
+    const canvas = displayEl.querySelector('canvas')
+    if (canvas) {
+      console.log('[RDP] Canvas actual size:', canvas.width, 'x', canvas.height)
+      console.log('[RDP] Canvas CSS size:', canvas.style.width, canvas.style.height)
     }
+    console.log('[RDP] Bounds div size:', displayEl.style.width, displayEl.style.height)
+  }
 
-    // Send initial size
-    const width = displayContainer.value?.clientWidth || 1024
-    const height = displayContainer.value?.clientHeight || 768
-    socket.send(JSON.stringify({ width, height }))
-
-    // Handle resize
-    window.addEventListener('resize', () => {
-      if (displayContainer.value) {
-        socket.send(JSON.stringify({
-          width: displayContainer.value.clientWidth,
-          height: displayContainer.value.clientHeight,
-        }))
+  // Diagnostic: count instructions and log on first sync
+  guacClient.onsync = (timestamp: number, frames: number) => {
+    syncCount++
+    if (syncCount === 1) {
+      console.log('[RDP] First sync! Instruction counts:', JSON.stringify(instrCounts))
+      console.log('[RDP] Display dimensions:', display.getWidth(), 'x', display.getHeight())
+      const canvas = displayEl.querySelector('canvas')
+      if (canvas) {
+        console.log('[RDP] First canvas:', canvas.width, 'x', canvas.height,
+          'CSS:', canvas.style.width, canvas.style.height)
       }
-    })
+      // Log all child elements of bounds div
+      console.log('[RDP] Bounds children:', displayEl.children.length)
+      for (let i = 0; i < displayEl.children.length; i++) {
+        const child = displayEl.children[i] as HTMLElement
+        console.log(`[RDP]   child ${i}:`, child.tagName, child.style.width, child.style.height)
+      }
+      // Canvas pixel sample — verify content was drawn after first sync
+      const firstCanvas = displayEl.querySelector('canvas')
+      if (firstCanvas) {
+        try {
+          const ctx = firstCanvas.getContext('2d')
+          if (ctx) {
+            const sample = ctx.getImageData(100, 100, 1, 1).data
+            console.log(`[RDP] First canvas pixel (100,100): rgba(${sample[0]},${sample[1]},${sample[2]},${sample[3]})`)
+          }
+        } catch(e) { /* tainted */ }
+      }
+    }
+    if (syncCount % 10 === 0) {
+      console.log(`[RDP] Sync #${syncCount}, display:`, display.getWidth(), 'x', display.getHeight(),
+        `imgDecoded=${imgDecoded} imgDrawn=${imgDrawn} imgFailed=${imgFailed}`)
+      // Canvas pixel sample — check if content was actually drawn
+      const canvas = displayEl.querySelector('canvas')
+      if (canvas && canvas.width > 0 && canvas.height > 0) {
+        try {
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            const sample = ctx.getImageData(
+              Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1
+            ).data
+            console.log(`[RDP] Canvas center pixel: rgba(${sample[0]},${sample[1]},${sample[2]},${sample[3]}), canvasSize=${canvas.width}x${canvas.height}`)
+          }
+        } catch(e) { /* tainted canvas */ }
+      }
+    }
+  }
+
+  // Diagnostic: instruction counter (non-intrusive — wrap after Client sets it)
+  const origOnInstr = tunnel.oninstruction
+  tunnel.oninstruction = (opcode: string, args: string[]) => {
+    instrCounts[opcode] = (instrCounts[opcode] || 0) + 1
+    if (opcode === 'size') {
+      console.log(`[RDP] size: layer=${args[0]} ${args[1]}x${args[2]}`)
+    } else if (opcode === 'img') {
+      console.log(`[RDP] img: stream=${args[0]} channelMask=${args[1]} layer=${args[2]} mime=${args[3]} ${args[4]}x${args[5]}`)
+    } else if (syncCount === 0 && opcode !== 'blob' && opcode !== 'end') {
+      console.log(`[RDP] pre-sync instr: ${opcode}`, args)
+    }
+    if (origOnInstr) origOnInstr(opcode, args)
+  }
+
+  // Send initial display size so guacd renders at the right dimensions
+  const w = displayContainer.value!.clientWidth || window.innerWidth
+  const h = displayContainer.value!.clientHeight || window.innerHeight
+  console.log('[RDP] Initial display size:', w, 'x', h)
+  guacClient.sendSize(w, h)
+
+  // Handle resize
+  window.addEventListener('resize', () => {
+    if (displayContainer.value && guacClient) {
+      const rw = displayContainer.value.clientWidth
+      const rh = displayContainer.value.clientHeight
+      console.log('[RDP] Resize to:', rw, 'x', rh)
+      guacClient.sendSize(rw, rh)
+    }
   })
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', onFullscreenChange)
-  guacClient?.disconnect()
+  tunnel?.disconnect()
+  guacClient = null
+  tunnel = null
 })
 </script>
 

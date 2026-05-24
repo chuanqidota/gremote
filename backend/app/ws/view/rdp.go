@@ -1,10 +1,8 @@
 package view
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"strings"
+	"os"
 	"sync"
 	"time"
 	"gwebssh/app/api/params"
@@ -19,14 +17,10 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// guacInstruction is the JSON format exchanged between browser and backend.
-type guacInstruction struct {
-	Op   string   `json:"op"`
-	Args []string `json:"args"`
-}
-
 // RDPHandler handles RDP WebSocket connections bridging browser to guacd.
 func (w wsHandle) RDPHandler(c *gin.Context) {
+	logger.Info(fmt.Sprintf("RDP WebSocket connection attempt from %s", c.ClientIP()))
+
 	// 1. Upgrade HTTP to WebSocket
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -35,13 +29,17 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 	}
 	defer conn.Close()
 
+	logger.Info("RDP WebSocket upgraded successfully")
+
 	// 2. Validate key from Redis
 	key := c.Param("key")
 	if key == "" {
+		logger.Error("RDP empty key")
 		_ = conn.WriteMessage(websocket.TextMessage, []byte("无效链接"))
 		return
 	}
 	if redis.IsConnected(key) {
+		logger.Error(fmt.Sprintf("RDP key already used: %s", key))
 		_ = conn.WriteMessage(websocket.TextMessage, []byte("链接失效,已经被链接过一次"))
 		return
 	}
@@ -49,9 +47,12 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 	// 3. Retrieve RDP info from Redis
 	var info params.RDPInfo
 	if err := redis.Get(key, &info); err != nil {
+		logger.Error(fmt.Sprintf("RDP Redis get failed for key %s: %s", key, err.Error()))
 		_ = conn.WriteMessage(websocket.TextMessage, []byte("获取登录信息失败"))
 		return
 	}
+
+	logger.Info(fmt.Sprintf("RDP connection info: target=%s port=%d user=%s", info.Target, info.Port, info.Username))
 
 	// Auto-fill client IP
 	clientIP := c.ClientIP()
@@ -76,71 +77,54 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 	e.WriteData(auditData)
 	defer e.UpdateEndTime(key)
 
-	// 5. Read first message for initial window size
-	_, firstMessage, err := conn.ReadMessage()
-	if err != nil {
-		_ = conn.WriteMessage(websocket.TextMessage, []byte("读取初始消息失败"))
-		return
-	}
-	var firstData map[string]any
-	if err := json.Unmarshal(firstMessage, &firstData); err != nil {
-		_ = conn.WriteMessage(websocket.TextMessage, []byte("解析窗口大小失败"))
-		return
-	}
-	widthFloat, ok1 := firstData["width"].(float64)
-	heightFloat, ok2 := firstData["height"].(float64)
-	if !ok1 || !ok2 {
-		_ = conn.WriteMessage(websocket.TextMessage, []byte("窗口大小数据格式错误"))
-		return
-	}
-	width := int(widthFloat)
-	height := int(heightFloat)
-
-	// 6. Connect to guacd via Guacamole protocol client
+	// 5. Connect to guacd via Guacamole protocol client
 	guacdHost := config.Conf.Guacd.Host
 	guacdPort := config.Conf.Guacd.Port
+	logger.Info(fmt.Sprintf("RDP connecting to guacd at %s:%d", guacdHost, guacdPort))
 	guacClient, err := guacamole.Connect(guacdHost, guacdPort)
 	if err != nil {
+		logger.Error(fmt.Sprintf("RDP guacd connect failed: %s", err.Error()))
 		_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("连接guacd失败: %s", err.Error())))
 		return
 	}
 	defer guacClient.Close()
+	logger.Info("RDP connected to guacd successfully")
 
-	// 7. Perform Guacamole handshake (select rdp + params)
+	// 6. Perform Guacamole handshake (select rdp + params)
 	guacParams := map[string]string{
-		"hostname":        info.Target,
-		"port":            fmt.Sprintf("%d", info.Port),
-		"username":        info.Username,
-		"password":        info.Password,
-		"security":        "any",
-		"ignore-cert":     "true",
-		"disable-audio":   "true",
-		"enable-wallpaper": "false",
-		"enable-theming":  "false",
+		"hostname":              info.Target,
+		"port":                  fmt.Sprintf("%d", info.Port),
+		"username":              info.Username,
+		"password":              info.Password,
+		"width":                 "1024",
+		"height":                "768",
+		"dpi":                   "96",
+		"security":              "any",
+		"ignore-cert":           "true",
+		"disable-audio":         "true",
+		"enable-wallpaper":      "false",
+		"enable-theming":        "false",
+		"recording-path":        fmt.Sprintf("/recordings/%s.guac", key),
+		"create-recording-path": "true",
 	}
 	if info.Domain != "" {
 		guacParams["domain"] = info.Domain
 	}
+	logger.Info("RDP starting Guacamole handshake")
 	if err := guacClient.Handshake("rdp", guacParams); err != nil {
+		logger.Error(fmt.Sprintf("RDP Guacamole handshake failed: %s", err.Error()))
 		_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Guacamole握手失败: %s", err.Error())))
 		return
 	}
+	logger.Info("RDP Guacamole handshake completed successfully")
 
-	// 8. Send initial size to guacd
-	if err := guacClient.Write("size", fmt.Sprintf("%d", width), fmt.Sprintf("%d", height)); err != nil {
-		_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("发送初始尺寸失败: %s", err.Error())))
-		return
-	}
-
-	// 9. Initialize recording (buffer data for MinIO upload)
-	var recordingBuf bytes.Buffer
-	var recordingMu sync.Mutex
-
-	// 10. Start goroutines
+	// 7. Start bridge goroutines
 	quitChan := make(chan bool, 2)
 	var wsMu sync.Mutex // protects WebSocket writes
 
-	// ReceiveWsMsg: WebSocket -> guacd
+	logger.Info("RDP starting bridge goroutines")
+
+	// ReceiveWsMsg: WebSocket -> guacd (raw Guacamole protocol)
 	go func() {
 		defer func() { rdpSetQuit(quitChan) }()
 		for {
@@ -154,8 +138,9 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 					return
 				}
 
-				var instr guacInstruction
-				if err := json.Unmarshal(message, &instr); err != nil {
+				// Parse raw Guacamole protocol instruction
+				instr, err := guacamole.ParseInstruction(string(message))
+				if err != nil {
 					logger.Error(fmt.Sprintf("RDP WS message parse error: %s", err.Error()))
 					continue
 				}
@@ -169,7 +154,9 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 		}
 	}()
 
-	// WriteWsMsg: guacd -> WebSocket
+	// WriteWsMsg: guacd -> WebSocket (raw Guacamole protocol)
+	// Uses 10s read deadline to send periodic nop keepalives while guacd
+	// establishes the RDP connection, preventing browser tunnel timeout.
 	go func() {
 		defer func() { rdpSetQuit(quitChan) }()
 		for {
@@ -177,43 +164,40 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 			case <-quitChan:
 				return
 			default:
-				instr, err := guacClient.Read()
-				if err != nil {
-					logger.Error(fmt.Sprintf("RDP guacd read error: %s", err.Error()))
-					return
-				}
+			}
 
-				// Convert to JSON for browser
-				guacMsg := guacInstruction{
-					Op:   instr.Op,
-					Args: instr.Args,
-				}
-				jsonData, err := json.Marshal(guacMsg)
-				if err != nil {
-					logger.Error(fmt.Sprintf("RDP JSON marshal error: %s", err.Error()))
+			instr, err := guacClient.ReadDeadline(10 * time.Second)
+			if err != nil {
+				if netErr, ok := err.(interface{ Timeout() bool }); ok && netErr.Timeout() {
+					wsMu.Lock()
+					_ = conn.WriteMessage(websocket.TextMessage, []byte("3.nop;"))
+					wsMu.Unlock()
 					continue
 				}
-
-				// Send to WebSocket
-				wsMu.Lock()
-				if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
-					wsMu.Unlock()
-					logger.Error(fmt.Sprintf("RDP WS write error: %s", err.Error()))
-					return
-				}
-				wsMu.Unlock()
-
-				// Buffer for recording (skip PNG data to save memory)
-				if instr.Op != "img" {
-					recordingMu.Lock()
-					recordingBuf.Write([]byte(fmt.Sprintf("%s,%s;", instr.Op, joinArgs(instr.Args))))
-					recordingMu.Unlock()
-				}
+				logger.Error(fmt.Sprintf("RDP guacd read error: %s", err.Error()))
+				return
 			}
+
+			// Only log non-streaming instructions to avoid log spam from large blob data
+			if instr.Op != "blob" && instr.Op != "end" {
+				logger.Info(fmt.Sprintf("RDP guacd -> WS: op=%s args=%v", instr.Op, instr.Args))
+			}
+
+			// Encode instruction to raw Guacamole protocol
+			rawInstr := guacamole.EncodeInstruction(instr.Op, instr.Args...)
+
+			// Send to WebSocket
+			wsMu.Lock()
+			if err := conn.WriteMessage(websocket.TextMessage, []byte(rawInstr)); err != nil {
+				wsMu.Unlock()
+				logger.Error(fmt.Sprintf("RDP WS write error: %s", err.Error()))
+				return
+			}
+			wsMu.Unlock()
 		}
 	}()
 
-	// 11. Wait for both goroutines to finish (with timeout)
+	// 8. Wait for both goroutines to finish (with timeout)
 	sessionDone := make(chan struct{})
 	go func() {
 		<-quitChan
@@ -227,28 +211,28 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 		logger.Error("RDP session timed out")
 	}
 
-	// Upload recording to MinIO
-	recordingMu.Lock()
-	if recordingBuf.Len() > 0 {
+	// 9. Upload guacd recording to MinIO
+	recordingPath := fmt.Sprintf("/recordings/%s.guac", key)
+	if data, err := os.ReadFile(recordingPath); err == nil {
 		recordingKey := fmt.Sprintf("%s.guac", key)
 		for i := 0; i < 10; i++ {
-			if err := s3.UploadFile(recordingKey, recordingBuf.Bytes()); err != nil {
+			if err := s3.UploadFile(recordingKey, data); err != nil {
 				logger.Error(fmt.Sprintf("RDP recording upload failed: %s", err.Error()))
 				time.Sleep(100 * time.Millisecond)
 				continue
 			}
-			logger.Info(fmt.Sprintf("RDP recording uploaded: %s", recordingKey))
+			logger.Info(fmt.Sprintf("RDP recording uploaded: %s (%d bytes)", recordingKey, len(data)))
 			break
 		}
+		// Clean up local recording file
+		if err := os.Remove(recordingPath); err != nil {
+			logger.Error(fmt.Sprintf("RDP recording cleanup failed: %s", err.Error()))
+		}
+	} else {
+		logger.Error(fmt.Sprintf("RDP recording file read failed: %s", err.Error()))
 	}
-	recordingMu.Unlock()
 
 	logger.Info(fmt.Sprintf("RDP session ended for key: %s", key))
-}
-
-// joinArgs joins arguments with comma separator for recording format.
-func joinArgs(args []string) string {
-	return strings.Join(args, ",")
 }
 
 // rdpSetQuit signals the quit channel (non-blocking).
