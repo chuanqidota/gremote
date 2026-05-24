@@ -76,8 +76,8 @@ func NewTerminal(client *ssh.Client, cols, rows int) (*Terminal, error) {
 	}
 
 	modes := ssh.TerminalModes{
-		ssh.ECHO:          1,     //  禁用回显（0禁用，1启动） 一定要开，不然会出问题
-		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud  传输速率
+		ssh.ECHO:          0,     // 关闭服务端回显，由 xterm.js 处理本地输入显示
+		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
 		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
 	}
 	if err = session.RequestPty("xterm", cols, rows, modes); err != nil {
@@ -160,6 +160,7 @@ func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool, esDataChan
 			t.ComboOutput.mu.Lock()
 			if t.ComboOutput.buffer.Len() == 0 {
 				t.ComboOutput.mu.Unlock()
+				time.Sleep(10 * time.Millisecond)
 				continue
 			}
 			data := make([]byte, t.ComboOutput.buffer.Len())
