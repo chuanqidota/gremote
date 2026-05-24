@@ -21,6 +21,6 @@ S3:
   UseSSL: false
   Bucket: gwebssh
 
-guacd:
-  host: guacd
-  port: 4822
+Guacd:
+  Host: guacd
+  Port: 4822

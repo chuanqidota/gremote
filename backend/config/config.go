@@ -39,8 +39,8 @@ type S3Config struct {
 }
 
 type GuacdConfig struct {
-	Host string `yaml:"host" comment:"guacd主机地址"`
-	Port int    `yaml:"port" comment:"guacd端口"`
+	Host string `yaml:"Host" comment:"guacd主机地址"`
+	Port int    `yaml:"Port" comment:"guacd端口"`
 }
 
 type Config struct {
@@ -49,7 +49,7 @@ type Config struct {
 	ElasticSearch ESConfig     `yaml:"ElasticSearch"`
 	Audit         AuditConfig  `yaml:"Audit"`
 	S3            S3Config     `yaml:"S3"`
-	Guacd         GuacdConfig  `yaml:"guacd"`
+	Guacd         GuacdConfig  `yaml:"Guacd"`
 }
 
 var Conf = new(Config)

@@ -15,6 +15,11 @@ services:
     restart: always
     ports:
       - "4822:4822"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 4822 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   elasticsearch:
     image: docker.1ms.run/library/elasticsearch:8.17.10
@@ -71,6 +76,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+      guacd:
+        condition: service_healthy
 
   frontend:
     build:
