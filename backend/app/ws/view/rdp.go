@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 	"gwebssh/app/api/params"
@@ -106,21 +107,21 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 	defer guacClient.Close()
 
 	// 7. Perform Guacamole handshake (select rdp + params)
-	params := map[string]string{
-		"hostname": info.Target,
-		"port":     fmt.Sprintf("%d", info.Port),
-		"username": info.Username,
-		"password": info.Password,
-		"security": "any",
-		"ignore-cert": "true",
-		"disable-audio": "true",
+	guacParams := map[string]string{
+		"hostname":        info.Target,
+		"port":            fmt.Sprintf("%d", info.Port),
+		"username":        info.Username,
+		"password":        info.Password,
+		"security":        "any",
+		"ignore-cert":     "true",
+		"disable-audio":   "true",
 		"enable-wallpaper": "false",
-		"enable-theming": "false",
+		"enable-theming":  "false",
 	}
 	if info.Domain != "" {
-		params["domain"] = info.Domain
+		guacParams["domain"] = info.Domain
 	}
-	if err := guacClient.Handshake("rdp", params); err != nil {
+	if err := guacClient.Handshake("rdp", guacParams); err != nil {
 		_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Guacamole握手失败: %s", err.Error())))
 		return
 	}
@@ -136,7 +137,7 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 	var recordingMu sync.Mutex
 
 	// 10. Start goroutines
-	quitChan := make(chan bool, 4)
+	quitChan := make(chan bool, 2)
 	var wsMu sync.Mutex // protects WebSocket writes
 
 	// ReceiveWsMsg: WebSocket -> guacd
@@ -212,8 +213,19 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 		}
 	}()
 
-	// 11. Wait for session to end
-	<-quitChan
+	// 11. Wait for both goroutines to finish (with timeout)
+	sessionDone := make(chan struct{})
+	go func() {
+		<-quitChan
+		<-quitChan
+		close(sessionDone)
+	}()
+
+	select {
+	case <-sessionDone:
+	case <-time.After(24 * time.Hour):
+		logger.Error("RDP session timed out")
+	}
 
 	// Upload recording to MinIO
 	recordingMu.Lock()
@@ -236,14 +248,7 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 
 // joinArgs joins arguments with comma separator for recording format.
 func joinArgs(args []string) string {
-	result := ""
-	for i, arg := range args {
-		if i > 0 {
-			result += ","
-		}
-		result += arg
-	}
-	return result
+	return strings.Join(args, ",")
 }
 
 // rdpSetQuit signals the quit channel (non-blocking).
