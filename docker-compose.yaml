@@ -51,7 +51,7 @@ services:
       - "8000:8000"
     env_file: .env
     environment:
-      GWEBSSH_SERVER_PORT: ${SERVER_PORT:-8000}
+      GWEBSSH_SERVER_PORT: ${SERVER_PORT}
       GWEBSSH_REDIS_ADDR: ${REDIS_ADDR}
       GWEBSSH_ELASTICSEARCH_URL: ${ES_URL}
       GWEBSSH_S3_ENDPOINT: ${MINIO_ENDPOINT}
