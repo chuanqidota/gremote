@@ -7,6 +7,14 @@ export interface SSHInfo {
   source?: string
 }
 
+export interface RDPInfo {
+  target: string
+  port: number
+  username: string
+  password: string
+  domain?: string
+}
+
 export interface FileItem {
   name: string
   size: number

@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { SSHInfo, FileItem, AuditRecord, AuditQuery } from '../types'
+import type { SSHInfo, RDPInfo, FileItem, AuditRecord, AuditQuery } from '../types'
 
 const http = axios.create({
   baseURL: '/api/v1',
@@ -8,6 +8,11 @@ const http = axios.create({
 
 export async function obtainKey(info: SSHInfo): Promise<string> {
   const { data } = await http.post('/obtain-key', info)
+  return data.key
+}
+
+export async function obtainKeyRDP(info: RDPInfo): Promise<string> {
+  const { data } = await http.post('/obtain-key-rdp', info)
   return data.key
 }
 
