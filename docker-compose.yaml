@@ -36,25 +36,11 @@ services:
       - "9001:9001"
     env_file: .env
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
-
-  minio-init:
-    image: minio/mc
-    depends_on:
-      minio:
-        condition: service_started
-    env_file: .env
-    entrypoint: >
-      /bin/sh -c "
-      sleep 3;
-      mc alias set local http://minio:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY};
-      mc mb --ignore-existing local/${MINIO_BUCKET};
-      echo 'Bucket ${MINIO_BUCKET} ready';
-      "
 
   backend:
     build:
@@ -77,8 +63,8 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
+      minio:
+        condition: service_started
 
   frontend:
     build:
