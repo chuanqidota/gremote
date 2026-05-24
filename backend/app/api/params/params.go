@@ -39,3 +39,14 @@ type LoginAuditQuery struct {
 	EndTime   string `form:"endTime" comment:"结束时间"`
 	Search    string `form:"search" comment:"搜索"`
 }
+
+// RDPInfo RDP登录信息
+type RDPInfo struct {
+	User     string `json:"user" comment:"用户"`
+	Source   string `json:"source" comment:"源地址"`
+	Target   string `json:"target" comment:"目标地址" binding:"required"`
+	Port     int    `json:"port" comment:"端口" binding:"required"`
+	Username string `json:"username" comment:"用户名" binding:"required"`
+	Password string `json:"password" comment:"密码" binding:"required"`
+	Domain   string `json:"domain" comment:"域名"`
+}

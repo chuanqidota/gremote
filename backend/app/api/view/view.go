@@ -42,6 +42,25 @@ func (a *apiHandle) ObtainKey(c *gin.Context) {
 	response.KeyRes(c, key)
 }
 
+// ObtainKeyRDP 获取RDP连接key
+func (a *apiHandle) ObtainKeyRDP(c *gin.Context) {
+	var info params.RDPInfo
+	if err := c.ShouldBindJSON(&info); err != nil {
+		response.Fail(c, fmt.Sprintf("参数错误-%s", err.Error()))
+		return
+	}
+	if info.Port == 0 {
+		info.Port = 3389
+	}
+	info.Source = c.ClientIP()
+	key := uuid.New().String()
+	if err := redis.Set(key, info, time.Duration(config.Conf.Server.SessionTTL)*time.Second); err != nil {
+		response.Fail(c, fmt.Sprintf("redis设置失败-%s", err.Error()))
+		return
+	}
+	response.KeyRes(c, key)
+}
+
 // ListFile 列出目录下的文件-大小-类型
 func (a *apiHandle) ListFile(c *gin.Context) {
 	// 获取key和path信息
