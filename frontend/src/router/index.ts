@@ -25,6 +25,11 @@ const routes = [
     name: 'playback',
     component: () => import('../pages/PlaybackPage.vue'),
   },
+  {
+    path: '/rdp',
+    name: 'rdp',
+    component: () => import('../pages/RdpPage.vue'),
+  },
 ]
 
 const router = createRouter({
