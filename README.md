@@ -1,13 +1,14 @@
 # GWebSSH - Web 终端连接系统
 
-基于 Go + Vue 3 的 Web SSH 终端，支持文件传输、操作审计和会话回放。
+基于 Go + Vue 3 的 Web SSH/RDP 终端，支持文件传输、操作审计和会话回放。
 
 ## 功能特性
 
-- **Web 终端**：基于 xterm.js，支持多主题（暗色、亮色、日光、德古拉）、全屏显示
+- **Web SSH 终端**：基于 xterm.js，支持多主题（暗色、亮色、日光、德古拉）、全屏显示
+- **Windows RDP 远程桌面**：基于 Apache Guacamole，支持 RDP 协议连接 Windows 机器
 - **文件管理**：通过 SFTP 实现文件浏览、上传、下载
-- **操作审计**：自动记录每次 SSH 登录，支持来源 IP、用户、目标主机等查询
-- **会话回放**：终端操作录制与回放，基于 asciinema 格式
+- **操作审计**：自动记录每次 SSH/RDP 登录，支持来源 IP、用户、目标主机等查询
+- **会话回放**：终端操作录制与回放，SSH 基于 asciinema 格式，RDP 基于 .guac 格式
 - **会话管理**：通过 Redis 临时存储会话密钥，支持配置过期时间
 - **Docker 一键部署**：提供 docker-compose 完整编排
 
@@ -28,8 +29,8 @@
 
 | 层级 | 技术栈 |
 |------|--------|
-| 前端 | Vue 3 + TypeScript + Element Plus + xterm.js + Vite |
-| 后端 | Go + Gin + WebSocket + SFTP |
+| 前端 | Vue 3 + TypeScript + Element Plus + xterm.js + guacamole-common-js + Vite |
+| 后端 | Go + Gin + WebSocket + SFTP + Guacamole Protocol |
 | 存储 | Redis（会话密钥）、Elasticsearch（审计日志）、MinIO/S3（录制文件） |
 | 部署 | Docker + Nginx 反向代理 |
 
@@ -61,7 +62,7 @@ cp .env.example .env
 #### 第三步：启动基础设施
 
 ```bash
-docker compose up -d minio redis elasticsearch
+docker compose up -d minio redis elasticsearch guacd
 ```
 
 启动后等待所有容器就绪（约 10-30 秒），可用以下命令检查：
@@ -185,6 +186,10 @@ S3:
   SecretAccessKey: xxx        # MinIO SecretKey
   UseSSL: false               # 是否使用 HTTPS
   Bucket: gwebssh             # 桶名
+
+Guacd:
+  Host: 127.0.0.1            # guacd 地址
+  Port: 4822                  # guacd 端口
 ```
 
 ### Docker 部署
@@ -269,7 +274,7 @@ window.open(`/term?key=${key}`, '_blank')
 
 ### 接入示例
 
-**JavaScript：**
+**JavaScript (SSH)：**
 
 ```javascript
 async function connectSSH(target, username, password) {
@@ -286,7 +291,24 @@ async function connectSSH(target, username, password) {
 connectSSH('192.168.1.100', 'root', 'mypassword')
 ```
 
-**Python：**
+**JavaScript (RDP)：**
+
+```javascript
+async function connectRDP(target, username, password, domain) {
+  const res = await fetch('/api/v1/obtain-key-rdp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target, username, password, port: 3389, domain })
+  })
+  const { key } = await res.json()
+  window.open(`/rdp?key=${key}&host=${target}`, '_blank')
+}
+
+// 调用
+connectRDP('192.168.1.100', 'Administrator', 'mypassword', 'WORKGROUP')
+```
+
+**Python (SSH)：**
 
 ```python
 import requests
@@ -301,6 +323,22 @@ key = resp.json()['key']
 print(f'打开终端: http://your-host/term?key={key}')
 ```
 
+**Python (RDP)：**
+
+```python
+import requests
+
+resp = requests.post('http://your-host/api/v1/obtain-key-rdp', json={
+    'target': '192.168.1.100',
+    'username': 'Administrator',
+    'password': 'mypassword',
+    'port': 3389,
+    'domain': 'WORKGROUP',
+})
+key = resp.json()['key']
+print(f'打开远程桌面: http://your-host/rdp?key={key}&host=192.168.1.100')
+```
+
 ---
 
 ## API 参考
@@ -311,7 +349,8 @@ print(f'打开终端: http://your-host/term?key={key}')
 
 | 方法 | 路径 | 说明 | 参数 |
 |------|------|------|------|
-| POST | `/obtain-key` | 获取会话密钥 | Body: `target, username, password, port, user?, source?` |
+| POST | `/obtain-key` | 获取 SSH 会话密钥 | Body: `target, username, password, port, user?, source?` |
+| POST | `/obtain-key-rdp` | 获取 RDP 会话密钥 | Body: `target, username, password, port, domain?` |
 | GET | `/list-file` | 浏览目录文件 | Query: `key, path` |
 | POST | `/upload-file` | 上传文件 | Form: `file` + Query: `key, path` |
 | GET | `/download-file` | 下载文件 | Query: `key, path, filename` |
@@ -323,7 +362,8 @@ print(f'打开终端: http://your-host/term?key={key}')
 
 | 协议 | 路径 | 说明 |
 |------|------|------|
-| WS | `/ws/v1/:key` | 终端连接，连接后发送 `{ "resize": [cols, rows] }` |
+| WS | `/ws/v1/:key` | SSH 终端连接，连接后发送 `{ "resize": [cols, rows] }` |
+| WS | `/ws/v1/rdp/:key` | RDP 远程桌面连接，连接后发送 `{ "width": N, "height": N }` |
 
 ### 响应格式
 
@@ -348,7 +388,7 @@ gwebssh/
 │   │   │   ├── params/       # 请求参数定义
 │   │   │   └── view/         # 接口处理
 │   │   └── ws/               # WebSocket 处理
-│   │       ├── view/         # WS 处理器
+│   │       ├── view/         # WS 处理器 (SSH + RDP)
 │   │       └── utils/
 │   │           ├── loginAudit/   # 登录审计
 │   │           ├── recordAudit/  # 操作审计
@@ -358,6 +398,7 @@ gwebssh/
 │   │   ├── es/               # Elasticsearch
 │   │   ├── redis/            # Redis
 │   │   ├── s3/               # MinIO/S3
+│   │   ├── guacamole/        # Guacamole 协议客户端
 │   │   ├── terminal/         # SSH 终端
 │   │   ├── file/             # SFTP 文件
 │   │   ├── logger/           # 日志
@@ -366,12 +407,15 @@ gwebssh/
 ├── frontend/                 # Vue 3 前端
 │   ├── src/
 │   │   ├── pages/            # 页面
-│   │   │   ├── ConnectPage.vue   # 连接页
-│   │   │   ├── TerminalPage.vue  # 终端页
+│   │   │   ├── ConnectPage.vue   # 连接页 (SSH + RDP)
+│   │   │   ├── TerminalPage.vue  # SSH 终端页
+│   │   │   ├── RdpPage.vue       # RDP 远程桌面页
 │   │   │   ├── AuditPage.vue     # 审计日志
 │   │   │   └── PlaybackPage.vue  # 会话回放
 │   │   ├── components/       # 组件
 │   │   ├── composables/      # 组合式函数
+│   │   │   ├── useRdpWebSocket.ts # RDP WebSocket 管理
+│   │   │   └── ...
 │   │   ├── api/              # API 封装
 │   │   └── types/            # 类型定义
 │   └── nginx.conf            # Nginx 配置
@@ -394,3 +438,25 @@ gwebssh/
 
 **Q: 如何修改会话过期时间？**
 修改 `backend/config/config.yaml` 中 `Server.SessionTTL`（单位：秒）。
+
+**Q: Windows RDP 连接失败？**
+1. 确认 guacd 服务已启动：`docker compose ps guacd`
+2. 确认目标 Windows 机器已开启 RDP 服务
+3. 检查防火墙是否允许 3389 端口
+4. 确认用户名密码正确，域用户需填写域名
+
+**Q: RDP 录像文件在哪里？**
+RDP 会话录像以 `.guac` 格式存储在 MinIO 中，文件名为 `{session-key}.guac`。
+
+**Q: guacd 容器启动失败？**
+1. 检查端口 4822 是否被占用：`lsof -i :4822`
+2. 查看容器日志：`docker compose logs guacd`
+3. ARM 架构电脑可能需要使用模拟运行，性能会有所下降
+
+**Q: 如何配置 guacd 连接？**
+修改 `backend/config/config.yaml` 中的 `Guacd` 配置：
+```yaml
+Guacd:
+  Host: 127.0.0.1  # guacd 地址，Docker 部署使用 guacd
+  Port: 4822       # guacd 端口
+```
