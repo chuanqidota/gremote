@@ -76,11 +76,11 @@ func NewTerminal(client *ssh.Client, cols, rows int) (*Terminal, error) {
 	}
 
 	modes := ssh.TerminalModes{
-		ssh.ECHO:          1,     // 开启回显，录像系统需要通过 stdout 捕获用户输入
+		ssh.ECHO:          1,     // 开启服务端回显
 		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
 		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
 	}
-	if err = session.RequestPty("xterm", cols, rows, modes); err != nil {
+	if err = session.RequestPty("xterm", rows, cols, modes); err != nil {
 		return nil, err
 	}
 	if err := session.Shell(); err != nil {

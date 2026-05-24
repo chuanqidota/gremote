@@ -47,7 +47,6 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
-import { AttachAddon } from 'xterm-addon-attach'
 import 'xterm/css/xterm.css'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useFileManager } from '../composables/useFileManager'
@@ -184,10 +183,21 @@ function initTerminal(socket: WebSocket) {
 
   fitAddon = new FitAddon()
   term.loadAddon(fitAddon)
-  term.loadAddon(new AttachAddon(socket))
   term.open(termContainer.value)
   fitAddon.fit()
   term.focus()
+
+  // 手动处理 WebSocket 双向通信（替代 AttachAddon）
+  term.onData((data) => {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(data)
+    }
+  })
+
+  socket.addEventListener('message', (ev) => {
+    const data = typeof ev.data === 'string' ? ev.data : new Uint8Array(ev.data)
+    term?.write(data)
+  })
 
   socket.send(JSON.stringify({ resize: [term.cols, term.rows] }))
 

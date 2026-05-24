@@ -92,10 +92,6 @@ func (w wsHandle) Handler(c *gin.Context) {
 	}
 	cols := resizeData[0]
 	rows := resizeData[1]
-
-	// 连接耗时-增加友好提示
-	_ = conn.WriteMessage(websocket.TextMessage, []byte("终端正在连接中,请稍等..."))
-
 	// ssh客户端
 	client, err := terminal.Client(info.Username, info.Password, info.Target, info.Port)
 	if err != nil {
@@ -116,9 +112,6 @@ func (w wsHandle) Handler(c *gin.Context) {
 	startTime := time.Now()
 	record := recordAudit.NewEsRecord()
 	asciinema.WriteHeader(key, cols, rows, startTime, record)
-
-	// 清屏操作 \033[2J 表示清除屏幕上的所有内容 \033[H 表示将光标移动到屏幕的左上角（也就是原点）。
-	_ = conn.WriteMessage(websocket.TextMessage, []byte("\033[2J\033[H"))
 
 	// 核心交互
 	quitChan := make(chan bool, 4)

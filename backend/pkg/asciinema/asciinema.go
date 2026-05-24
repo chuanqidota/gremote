@@ -50,3 +50,15 @@ func WriteData(key string, startTime time.Time, out string, record *recordAudit.
 	record.WriteData(data)
 }
 
+// WriteInputData 写入用户输入数据
+func WriteInputData(key string, startTime time.Time, input string, record *recordAudit.EsRecord) {
+	sub := float64(time.Since(startTime).Microseconds()) / float64(1000000)
+	history, _ := json.Marshal([]any{sub, "i", input})
+	data := map[string]any{
+		"key":       key,
+		"timeStamp": time.Now().UnixNano() / int64(time.Millisecond),
+		"history":   string(history),
+	}
+	record.WriteData(data)
+}
+
