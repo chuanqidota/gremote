@@ -17,7 +17,7 @@ services:
     ports:
       - "4822:4822"
     volumes:
-      - guac_recordings:/recordings
+      - ./recordings:/recordings
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 4822 || exit 1"]
       interval: 10s
@@ -64,7 +64,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - guac_recordings:/recordings
+      - ./recordings:/recordings
     env_file: .env
     environment:
       GWEBSSH_SERVER_PORT: ${SERVER_PORT}
@@ -97,4 +97,3 @@ services:
 volumes:
   es_data:
   minio_data:
-  guac_recordings:

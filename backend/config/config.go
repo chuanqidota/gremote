@@ -39,8 +39,9 @@ type S3Config struct {
 }
 
 type GuacdConfig struct {
-	Host string `yaml:"Host" comment:"guacd主机地址"`
-	Port int    `yaml:"Port" comment:"guacd端口"`
+	Host          string `yaml:"Host" comment:"guacd主机地址"`
+	Port          int    `yaml:"Port" comment:"guacd端口"`
+	RecordingPath string `yaml:"RecordingPath" comment:"guacd录制文件路径"`
 }
 
 type Config struct {

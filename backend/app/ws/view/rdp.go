@@ -224,7 +224,12 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 
 	// 9. Upload guacd recording to MinIO
 	// Wait for guacd to finish writing the recording file
-	recordingPath := fmt.Sprintf("/recordings/%s.guac", key)
+	// guacd creates a directory <key>.guac/ with a "recording" file inside
+	recordBasePath := config.Conf.Guacd.RecordingPath
+	if recordBasePath == "" {
+		recordBasePath = "/recordings"
+	}
+	recordingPath := fmt.Sprintf("%s/%s.guac/recording", recordBasePath, key)
 	recordingKey := fmt.Sprintf("%s.guac", key)
 	var data []byte
 	for i := 0; i < 10; i++ {

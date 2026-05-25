@@ -24,3 +24,4 @@ S3:
 Guacd:
   Host: 127.0.0.1
   Port: 4822
+  RecordingPath: ./recordings
