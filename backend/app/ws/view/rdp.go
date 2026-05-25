@@ -90,14 +90,25 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 	defer guacClient.Close()
 	logger.Info("RDP connected to guacd successfully")
 
-	// 6. Perform Guacamole handshake (select rdp + params)
+	// 6. Read viewport size from query params (sent by browser)
+	width := c.Query("width")
+	height := c.Query("height")
+	if width == "" {
+		width = "1024"
+	}
+	if height == "" {
+		height = "768"
+	}
+	logger.Info(fmt.Sprintf("RDP viewport size: %sx%s", width, height))
+
+	// 7. Perform Guacamole handshake (select rdp + params)
 	guacParams := map[string]string{
 		"hostname":              info.Target,
 		"port":                  fmt.Sprintf("%d", info.Port),
 		"username":              info.Username,
 		"password":              info.Password,
-		"width":                 "1024",
-		"height":                "768",
+		"width":                 width,
+		"height":                height,
 		"dpi":                   "96",
 		"security":              "any",
 		"ignore-cert":           "true",

@@ -16,7 +16,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { FullScreen, Close } from '@element-plus/icons-vue'
@@ -102,8 +102,61 @@ CanvasRenderingContext2D.prototype.drawImage = function(...args: any[]) {
 	return _origDrawImage.apply(this, args as any)
 }
 
+function getToolbarHeight(): number {
+  const toolbarEl = document.querySelector('.rdp-toolbar') as HTMLElement
+  return toolbarEl ? toolbarEl.offsetHeight : 0
+}
+
+function updateContainerSize() {
+  if (!displayContainer.value) return
+  const toolbarH = isFullscreen.value ? 0 : getToolbarHeight()
+  displayContainer.value.style.top = toolbarH + 'px'
+  displayContainer.value.style.width = window.innerWidth + 'px'
+  displayContainer.value.style.height = (window.innerHeight - toolbarH) + 'px'
+  console.log(`[RDP] updateContainerSize: window=${window.innerWidth}x${window.innerHeight} toolbarH=${toolbarH} fullscreen=${isFullscreen.value} container=${displayContainer.value.style.width}x${displayContainer.value.style.height}`)
+}
+
+// Scale Guacamole display to fill the container using CSS transform
+function fitDisplay() {
+  if (!guacClient || !displayContainer.value) return
+  const display = guacClient.getDisplay()
+  const container = displayContainer.value
+  const containerW = container.clientWidth
+  const containerH = container.clientHeight
+  const displayW = display.getWidth()
+  const displayH = display.getHeight()
+  if (displayW === 0 || displayH === 0 || containerW === 0 || containerH === 0) {
+    console.log(`[RDP] fitDisplay: SKIP zero dims container=${containerW}x${containerH} display=${displayW}x${displayH}`)
+    return
+  }
+  const scale = Math.min(containerW / displayW, containerH / displayH)
+  console.log(`[RDP] fitDisplay: container=${containerW}x${containerH} display=${displayW}x${displayH} scale=${scale}`)
+  display.scale(scale)
+}
+
 function onFullscreenChange() {
   isFullscreen.value = !!document.fullscreenElement
+  // Hide toolbar in fullscreen so remote desktop gets full screen area
+  const toolbarEl = document.querySelector('.rdp-toolbar') as HTMLElement
+  if (toolbarEl) {
+    toolbarEl.style.display = isFullscreen.value ? 'none' : 'flex'
+  }
+  // Use requestAnimationFrame to wait for browser to finish fullscreen animation
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      updateContainerSize()
+      fitDisplay()
+      // Resize RDP session to match the new viewport so the display fills the screen.
+      if (guacClient && status.value === 'connected') {
+        guacClient.sendSize(window.innerWidth, window.innerHeight)
+      }
+      // Retry fitDisplay after sendSize takes effect (guacd is async)
+      setTimeout(() => {
+        updateContainerSize()
+        fitDisplay()
+      }, 300)
+    })
+  })
 }
 
 function toggleFullscreen() {
@@ -122,10 +175,19 @@ onMounted(() => {
 
   document.addEventListener('fullscreenchange', onFullscreenChange)
 
-  // Build WebSocket URL
+  // Force page layout via JavaScript (scoped CSS may not apply to dynamic elements)
+  const pageEl = document.querySelector('.rdp-page') as HTMLElement
+  if (pageEl) {
+    pageEl.style.position = 'relative'
+    pageEl.style.height = '100vh'
+    pageEl.style.overflow = 'hidden'
+  }
+
+  // Build WebSocket URL with viewport dimensions (excluding toolbar)
   const backendHost = import.meta.env.VITE_API_HOST || 'localhost:8000'
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const wsUrl = `${protocol}//${backendHost}/ws/v1/rdp/${key}`
+  const toolbarH = getToolbarHeight()
+  const wsUrl = `${protocol}//${backendHost}/ws/v1/rdp/${key}?width=${window.innerWidth}&height=${window.innerHeight - toolbarH}`
 
   // Create Guacamole tunnel, client, and display
   tunnel = new Guacamole.WebSocketTunnel(wsUrl)
@@ -135,10 +197,23 @@ onMounted(() => {
   const displayEl = guacClient.getDisplay().getElement()
   displayContainer.value!.appendChild(displayEl)
 
-  // Mouse input
+  // Hide system cursor (guacamole renders its own remote cursor)
+  displayEl.style.cursor = 'none'
+
+  // Force container to fill viewport below toolbar (CSS scoped rules may not apply)
+  const container = displayContainer.value!
+  container.style.position = 'fixed'
+  container.style.left = '0'
+  container.style.overflow = 'hidden'
+  container.style.zIndex = '1'
+  updateContainerSize()
+
+  const guacDisplay = guacClient.getDisplay()
+
+  // Mouse input — applyDisplayScale=true corrects coordinates for CSS transform scaling
   const mouse = new Guacamole.Mouse(displayEl)
   mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = (mouseState: any) => {
-    guacClient.sendMouseState(mouseState)
+    guacClient.sendMouseState(mouseState, true)
   }
 
   // Keyboard input
@@ -182,24 +257,20 @@ onMounted(() => {
   // Connect — Client.connect() sets up its own oninstruction handler
   guacClient.connect('')
 
-  // Diagnostic: watch display resize
-  const display = guacClient.getDisplay()
-  display.onresize = (width: number, height: number) => {
+  // Re-fit display when guacd resizes it
+  guacDisplay.onresize = (width: number, height: number) => {
     console.log('[RDP] Display resized to:', width, 'x', height)
-    const canvas = displayEl.querySelector('canvas')
-    if (canvas) {
-      console.log('[RDP] Canvas actual size:', canvas.width, 'x', canvas.height)
-      console.log('[RDP] Canvas CSS size:', canvas.style.width, canvas.style.height)
-    }
-    console.log('[RDP] Bounds div size:', displayEl.style.width, displayEl.style.height)
+    fitDisplay()
   }
 
   // Diagnostic: count instructions and log on first sync
   guacClient.onsync = (timestamp: number, frames: number) => {
     syncCount++
     if (syncCount === 1) {
+      // Scale display to fill container now that dimensions are known
+      fitDisplay()
       console.log('[RDP] First sync! Instruction counts:', JSON.stringify(instrCounts))
-      console.log('[RDP] Display dimensions:', display.getWidth(), 'x', display.getHeight())
+      console.log('[RDP] Display dimensions:', guacDisplay.getWidth(), 'x', guacDisplay.getHeight())
       const canvas = displayEl.querySelector('canvas')
       if (canvas) {
         console.log('[RDP] First canvas:', canvas.width, 'x', canvas.height,
@@ -224,7 +295,7 @@ onMounted(() => {
       }
     }
     if (syncCount % 10 === 0) {
-      console.log(`[RDP] Sync #${syncCount}, display:`, display.getWidth(), 'x', display.getHeight(),
+      console.log(`[RDP] Sync #${syncCount}, display:`, guacDisplay.getWidth(), 'x', guacDisplay.getHeight(),
         `imgDecoded=${imgDecoded} imgDrawn=${imgDrawn} imgFailed=${imgFailed}`)
       // Canvas pixel sample — check if content was actually drawn
       const canvas = displayEl.querySelector('canvas')
@@ -256,20 +327,22 @@ onMounted(() => {
     if (origOnInstr) origOnInstr(opcode, args)
   }
 
-  // Send initial display size so guacd renders at the right dimensions
-  const w = displayContainer.value!.clientWidth || window.innerWidth
-  const h = displayContainer.value!.clientHeight || window.innerHeight
-  console.log('[RDP] Initial display size:', w, 'x', h)
-  guacClient.sendSize(w, h)
-
-  // Handle resize
+  // Handle resize — update container size, fit display, and remote resolution
+  // Debounce the entire handler to prevent resize spirals (fitDisplay → scale change → resize → ...)
+  let resizeTimer: ReturnType<typeof setTimeout> | null = null
   window.addEventListener('resize', () => {
-    if (displayContainer.value && guacClient) {
-      const rw = displayContainer.value.clientWidth
-      const rh = displayContainer.value.clientHeight
-      console.log('[RDP] Resize to:', rw, 'x', rh)
-      guacClient.sendSize(rw, rh)
-    }
+    if (resizeTimer) clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(() => {
+      if (displayContainer.value && guacClient) {
+        updateContainerSize()
+        fitDisplay()
+        // Only sendSize in non-fullscreen mode; fullscreen uses CSS scaling
+        if (!isFullscreen.value && guacClient && status.value === 'connected') {
+          const toolbarH = getToolbarHeight()
+          guacClient.sendSize(window.innerWidth, window.innerHeight - toolbarH)
+        }
+      }
+    }, 100)
   })
 })
 
@@ -283,13 +356,15 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .rdp-page {
-  display: flex;
-  flex-direction: column;
+  position: relative;
   height: 100vh;
   background: #1e1e1e;
+  overflow: hidden;
 }
 
 .rdp-toolbar {
+  position: relative;
+  z-index: 10;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -315,7 +390,6 @@ onBeforeUnmount(() => {
 }
 
 .rdp-display {
-  flex: 1;
   overflow: hidden;
 }
 </style>

@@ -25,6 +25,7 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
+	Subprotocols: []string{"guacamole"},
 }
 
 func (w wsHandle) Handler(c *gin.Context) {

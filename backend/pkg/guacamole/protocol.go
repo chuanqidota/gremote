@@ -44,7 +44,12 @@ func ReadInstruction(r io.Reader) (*Instruction, error) {
 	// Remove trailing ';'
 	line = line[:len(line)-1]
 
-	raw := string(line)
+	return ParseInstruction(string(line))
+}
+
+// ParseInstruction parses a raw Guacamole protocol instruction string.
+// Format: "length.field1,length.field2,...,length.fieldN;"
+func ParseInstruction(raw string) (*Instruction, error) {
 	if raw == "" {
 		return nil, fmt.Errorf("empty instruction")
 	}
@@ -72,4 +77,15 @@ func ReadInstruction(r io.Reader) (*Instruction, error) {
 		}
 	}
 	return instr, nil
+}
+
+// EncodeInstruction encodes an instruction to raw Guacamole protocol format.
+// Returns: "length.field1,length.field2,...,length.fieldN;"
+func EncodeInstruction(op string, args ...string) string {
+	parts := make([]string, 0, len(args)+1)
+	parts = append(parts, encodeField(op))
+	for _, arg := range args {
+		parts = append(parts, encodeField(arg))
+	}
+	return strings.Join(parts, ",") + ";"
 }
