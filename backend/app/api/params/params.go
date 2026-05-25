@@ -38,6 +38,7 @@ type LoginAuditQuery struct {
 	StartTime string `form:"startTime" comment:"开始时间"`
 	EndTime   string `form:"endTime" comment:"结束时间"`
 	Search    string `form:"search" comment:"搜索"`
+	Protocol  string `form:"protocol" comment:"协议类型"`
 }
 
 // RDPInfo RDP登录信息

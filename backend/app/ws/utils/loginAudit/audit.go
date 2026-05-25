@@ -25,7 +25,8 @@ func NewEsAudit() *EsAudit {
 					"endTime":{"type":"keyword"},
 					"user":{"type":"keyword"},
 					"source":{"type":"keyword"},
-					"target":{"type":"keyword"}
+					"target":{"type":"keyword"},
+					"protocol":{"type":"keyword"}
 				}
 			}`,
 		},
@@ -45,6 +46,7 @@ func (e *EsAudit) ReadData(data params.LoginAuditQuery) ([]map[string]any, int64
 	search := data.Search
 	limit := data.Limit
 	offset := data.Offset
+	protocol := data.Protocol
 
 	var must []map[string]any
 	if user != "" {
@@ -66,6 +68,20 @@ func (e *EsAudit) ReadData(data params.LoginAuditQuery) ([]map[string]any, int64
 		must = append(must, map[string]any{
 			"range": map[string]any{
 				"timestamp": map[string]string{"gte": startTime, "lte": endTime},
+			},
+		})
+	}
+	if protocol != "" {
+		must = append(must, map[string]any{
+			"term": map[string]string{"protocol": protocol},
+		})
+	} else {
+		// When no protocol filter, exclude RDP sessions (show SSH only)
+		must = append(must, map[string]any{
+			"bool": map[string]any{
+				"must_not": []map[string]any{
+					{"term": map[string]string{"protocol": "rdp"}},
+				},
 			},
 		})
 	}

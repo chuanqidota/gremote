@@ -66,3 +66,22 @@ func GetFile(key string) ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
+
+// ListFiles 列出S3中指定前缀的文件
+func ListFiles(prefix string) ([]string, error) {
+	if S3Client == nil {
+		return nil, fmt.Errorf("S3客户端未初始化")
+	}
+	bucketName := config.Conf.S3.Bucket
+	var files []string
+	for obj := range S3Client.ListObjects(context.Background(), bucketName, minio.ListObjectsOptions{
+		Prefix:    prefix,
+		Recursive: true,
+	}) {
+		if obj.Err != nil {
+			return nil, fmt.Errorf("列出S3文件失败-%s", obj.Err)
+		}
+		files = append(files, obj.Key)
+	}
+	return files, nil
+}

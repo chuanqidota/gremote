@@ -21,6 +21,8 @@ func Engine() *gin.Engine {
 		api.GET("login-audit", apiview.ApiHandle.LoginAudit)
 		api.GET("record-url", apiview.ApiHandle.RecordUrl)
 		api.GET("record-file", apiview.ApiHandle.RecordFile)
+		api.GET("record-file-guac", apiview.ApiHandle.RecordFileGuac)
+		api.GET("list-guac-files", apiview.ApiHandle.ListGuacFiles)
 	}
 
 	ws := router.Group("ws/v1").Use(middleware.CORSMiddleware())

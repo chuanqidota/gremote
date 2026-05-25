@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { queryAudit, getRecordUrl } from '../api'
+import { queryAudit, getRecordUrl, getRecordFileGuacUrl } from '../api'
 import type { AuditRecord, AuditQuery } from '../types'
 
 export function useAudit() {
@@ -26,5 +26,9 @@ export function useAudit() {
     return getRecordUrl(key)
   }
 
-  return { data, count, loading, error, fetch, fetchRecordUrl }
+  function fetchGuacRecordUrl(key: string): string {
+    return getRecordFileGuacUrl(key)
+  }
+
+  return { data, count, loading, error, fetch, fetchRecordUrl, fetchGuacRecordUrl }
 }

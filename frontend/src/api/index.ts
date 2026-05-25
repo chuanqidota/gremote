@@ -40,3 +40,7 @@ export async function getRecordUrl(key: string): Promise<string> {
   const { data } = await http.get('/record-url', { params: { key } })
   return data.data
 }
+
+export function getRecordFileGuacUrl(key: string): string {
+  return `/api/v1/record-file-guac?key=${encodeURIComponent(key)}`
+}

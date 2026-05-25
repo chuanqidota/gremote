@@ -28,6 +28,7 @@ export interface AuditRecord {
   target: string
   startTime: string
   endTime: string
+  protocol?: string
 }
 
 export interface AuditQuery {
@@ -39,4 +40,5 @@ export interface AuditQuery {
   startTime?: string
   endTime?: string
   search?: string
+  protocol?: string
 }

@@ -223,9 +223,26 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 	}
 
 	// 9. Upload guacd recording to MinIO
+	// Wait for guacd to finish writing the recording file
 	recordingPath := fmt.Sprintf("/recordings/%s.guac", key)
-	if data, err := os.ReadFile(recordingPath); err == nil {
-		recordingKey := fmt.Sprintf("%s.guac", key)
+	recordingKey := fmt.Sprintf("%s.guac", key)
+	var data []byte
+	for i := 0; i < 10; i++ {
+		time.Sleep(500 * time.Millisecond)
+		var err error
+		data, err = os.ReadFile(recordingPath)
+		if err == nil && len(data) > 0 {
+			logger.Info(fmt.Sprintf("RDP recording file read successfully: %s (%d bytes)", recordingPath, len(data)))
+			break
+		}
+		if err != nil {
+			logger.Error(fmt.Sprintf("RDP recording file read attempt %d failed: %s", i+1, err.Error()))
+		} else {
+			logger.Error(fmt.Sprintf("RDP recording file is empty on attempt %d", i+1))
+		}
+	}
+
+	if len(data) > 0 {
 		for i := 0; i < 10; i++ {
 			if err := s3.UploadFile(recordingKey, data); err != nil {
 				logger.Error(fmt.Sprintf("RDP recording upload failed: %s", err.Error()))
@@ -240,7 +257,7 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 			logger.Error(fmt.Sprintf("RDP recording cleanup failed: %s", err.Error()))
 		}
 	} else {
-		logger.Error(fmt.Sprintf("RDP recording file read failed: %s", err.Error()))
+		logger.Error(fmt.Sprintf("RDP recording file not found after retries: %s", recordingPath))
 	}
 
 	logger.Info(fmt.Sprintf("RDP session ended for key: %s", key))

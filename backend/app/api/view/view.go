@@ -197,3 +197,36 @@ func (a *apiHandle) RecordFile(c *gin.Context) {
 	c.Header("Content-Type", "text/plain; charset=utf-8")
 	c.Data(200, "text/plain; charset=utf-8", data)
 }
+
+// RecordFileGuac 获取RDP录制文件内容(.guac格式)
+func (a *apiHandle) RecordFileGuac(c *gin.Context) {
+	key := c.Query("key")
+	if key == "" {
+		response.Fail(c, "参数错误")
+		return
+	}
+	guacKey := fmt.Sprintf("%s.guac", key)
+	data, err := s3.GetFile(guacKey)
+	if err != nil {
+		response.Fail(c, fmt.Sprintf("读取RDP录制文件失败-%s", err.Error()))
+		return
+	}
+	c.Header("Content-Type", "application/octet-stream")
+	c.Data(200, "application/octet-stream", data)
+}
+
+// ListGuacFiles 列出S3中所有.guac录制文件（调试用）
+func (a *apiHandle) ListGuacFiles(c *gin.Context) {
+	files, err := s3.ListFiles("")
+	if err != nil {
+		response.Fail(c, fmt.Sprintf("列出文件失败-%s", err.Error()))
+		return
+	}
+	var guacFiles []string
+	for _, f := range files {
+		if len(f) > 5 && f[len(f)-5:] == ".guac" {
+			guacFiles = append(guacFiles, f)
+		}
+	}
+	response.Success(c, "执行成功", guacFiles)
+}

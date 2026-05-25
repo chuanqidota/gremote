@@ -34,21 +34,42 @@
             <el-button type="primary" size="small" @click="fetchData">查询</el-button>
           </div>
         </div>
-        <el-table :data="data" v-loading="loading" border stripe>
-          <el-table-column prop="user" label="用户" width="100" />
-          <el-table-column prop="source" label="来源 IP" width="140" />
-          <el-table-column prop="target" label="目标主机" width="140" />
-          <el-table-column prop="startTime" label="开始时间" width="180" />
-          <el-table-column prop="endTime" label="结束时间" width="180" />
-          <el-table-column prop="key" label="会话 Key" min-width="200" show-overflow-tooltip />
-          <el-table-column label="操作" width="80" fixed="right">
-            <template #default="{ row }">
-              <el-button type="primary" link size="small" @click="onPlayback(row.key)">
-                回放
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+        <el-tabs v-model="activeTab" @tab-change="onTabChange">
+          <el-tab-pane label="Linux (SSH)" name="linux">
+            <el-table :data="data" v-loading="loading" border stripe>
+              <el-table-column prop="user" label="用户" width="100" />
+              <el-table-column prop="source" label="来源 IP" width="140" />
+              <el-table-column prop="target" label="目标主机" width="140" />
+              <el-table-column prop="startTime" label="开始时间" width="180" />
+              <el-table-column prop="endTime" label="结束时间" width="180" />
+              <el-table-column prop="key" label="会话 Key" min-width="200" show-overflow-tooltip />
+              <el-table-column label="操作" width="80" fixed="right">
+                <template #default="{ row }">
+                  <el-button type="primary" link size="small" @click="onPlayback(row.key, 'ssh')">
+                    回放
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-tab-pane>
+          <el-tab-pane label="Windows (RDP)" name="windows">
+            <el-table :data="data" v-loading="loading" border stripe>
+              <el-table-column prop="user" label="用户" width="100" />
+              <el-table-column prop="source" label="来源 IP" width="140" />
+              <el-table-column prop="target" label="目标主机" width="140" />
+              <el-table-column prop="startTime" label="开始时间" width="180" />
+              <el-table-column prop="endTime" label="结束时间" width="180" />
+              <el-table-column prop="key" label="会话 Key" min-width="200" show-overflow-tooltip />
+              <el-table-column label="操作" width="80" fixed="right">
+                <template #default="{ row }">
+                  <el-button type="primary" link size="small" @click="onPlayback(row.key, 'rdp')">
+                    回放
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-tab-pane>
+        </el-tabs>
         <el-pagination
           v-model:current-page="page"
           v-model:page-size="pageSize"
@@ -70,6 +91,7 @@ import { useAudit } from '../composables/useAudit'
 
 const { data, count, loading, fetch } = useAudit()
 
+const activeTab = ref('linux')
 const search = ref('')
 const dateRange = ref<[string, string] | null>(null)
 const page = ref(1)
@@ -78,12 +100,14 @@ const pageSize = ref(10)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 function buildQuery() {
+  const protocol = activeTab.value === 'windows' ? 'rdp' : undefined
   return {
     offset: (page.value - 1) * pageSize.value,
     limit: pageSize.value,
     search: search.value || undefined,
     startTime: dateRange.value?.[0],
     endTime: dateRange.value?.[1],
+    protocol,
   }
 }
 
@@ -103,8 +127,13 @@ function onDateChange() {
   page.value = 1
 }
 
-function onPlayback(key: string) {
-  window.open(`/playback?key=${key}`, '_blank')
+function onTabChange() {
+  page.value = 1
+  fetchData()
+}
+
+function onPlayback(key: string, protocol: string) {
+  window.open(`/playback?key=${key}&protocol=${protocol}`, '_blank')
 }
 
 onMounted(() => {
