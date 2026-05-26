@@ -33,8 +33,8 @@
         <el-button size="small" @click="togglePlay">{{ paused ? '▶ 播放' : '⏸ 暂停' }}</el-button>
         <el-slider :model-value="progress" :max="100" :show-tooltip="true" :format-tooltip="fmtTooltip" style="flex: 1" @change="onSeek" />
         <span class="time-display">{{ fmtTime(currentTime) }} / {{ fmtTime(totalDuration) }}</span>
-        <el-dropdown v-if="isRdp" trigger="click" @command="guacPlayback.setSpeed">
-          <el-button size="small" class="speed-btn">{{ guacPlayback.playbackSpeed.value }}x</el-button>
+        <el-dropdown trigger="click" @command="onSetSpeed">
+          <el-button size="small" class="speed-btn">{{ playbackSpeed }}x</el-button>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item :command="0.5">0.5x</el-dropdown-item>
@@ -81,6 +81,9 @@ const ssh = isRdp ? null : {
   currentTime: ref(0),
   duration: ref(0),
 }
+
+const sshSpeed = ref(1)
+const playbackSpeed = computed(() => isRdp ? guacPlayback.playbackSpeed.value : sshSpeed.value)
 
 const showLoading = computed(() => isRdp ? guacPlayback.loading.value : ssh!.loading.value)
 const showError = computed(() => isRdp ? guacPlayback.error.value : ssh!.error.value)
@@ -131,6 +134,20 @@ function onSeek(pos: number) {
     guacPlayback.seek(pos)
   } else {
     seekSsh(pos)
+  }
+}
+
+function onSetSpeed(speed: number) {
+  if (isRdp) {
+    guacPlayback.setSpeed(speed)
+    return
+  }
+  const currentPos = ssh!.currentTime.value
+  sshSpeed.value = speed
+  startTime = performance.now() - currentPos * 1000 / speed
+  if (!ssh!.paused.value) {
+    clearTimers()
+    scheduleSshEvents()
   }
 }
 
@@ -202,7 +219,8 @@ function scheduleSshEvents() {
   const now = performance.now()
   while (eventIndex < events.length) {
     const ev = events[eventIndex]
-    const delay = ev.time * 1000 - (now - startTime)
+    const elapsed = (now - startTime) * sshSpeed.value
+    const delay = ev.time * 1000 - elapsed
     if (delay > 0) {
       timerIds.push(window.setTimeout(() => {
         if (!ssh!.paused.value) {
@@ -237,7 +255,7 @@ function seekSsh(pos: number) {
   }
   ssh!.currentTime.value = acc
   ssh!.progress.value = pos
-  startTime = performance.now() - acc * 1000
+  startTime = performance.now() - acc * 1000 / sshSpeed.value
   if (!ssh!.paused.value) scheduleSshEvents()
 }
 
@@ -271,6 +289,7 @@ async function initSsh() {
   terminal.open(playerContainer.value)
   fitAddon.fit()
   startTime = performance.now()
+  sshSpeed.value = 1
   scheduleSshEvents()
 }
 

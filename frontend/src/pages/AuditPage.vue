@@ -19,6 +19,7 @@
               style="width: 220px"
               size="small"
               @input="onSearch"
+              @clear="onSearch"
             />
             <el-date-picker
               v-model="dateRange"
@@ -134,6 +135,7 @@ function onSearch() {
 
 function onDateChange() {
   page.value = 1
+  fetchData()
 }
 
 function onTabChange() {
