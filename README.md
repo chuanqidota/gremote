@@ -12,16 +12,29 @@
 - **会话管理**：通过 Redis 临时存储会话密钥，支持配置过期时间
 - **Docker 一键部署**：提供 docker-compose 完整编排
 
+---
+
 ## 页面展示
 
-### 连接页面
-![连接页面](docs/image/01_连接页面.png)
+### SSH 连接
 
-### 审计日志
-![审计日志](docs/image/02_审计日志页面.png)
+![Linux 连接](docs/image/01_linux连接.png)
 
-### 操作回放
-![操作回放](docs/image/03_操作回放页面.png)
+### RDP 连接
+
+![Windows 连接](docs/image/02_windows连接.png)
+
+### 回放列表
+
+| Linux | Windows |
+|-------|---------|
+| ![Linux 回放列表](docs/image/03_linux回放列表.png) | ![Windows 连接列表](docs/image/04_windows连接列表.png) |
+
+### 录像回放
+
+| Linux | Windows |
+|-------|---------|
+| ![Linux 录像回放](docs/image/05_linux录像回放.png) | ![Windows 录像回放](docs/image/06_windows录像回放.png) |
 
 ---
 
@@ -426,6 +439,7 @@ gremote/
 │   │   ├── api/              # API 封装
 │   │   └── types/            # 类型定义
 │   └── nginx.conf            # Nginx 配置
+├── guac-worker/              # Guacamole 录像转换服务
 ├── docker-compose.yaml
 └── README.md
 ```
