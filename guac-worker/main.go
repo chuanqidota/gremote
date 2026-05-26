@@ -2,29 +2,42 @@ package main
 
 import (
 	"log"
-	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/viper"
 )
 
 type Config struct {
-	S3Endpoint  string
-	S3AccessKey string
-	S3SecretKey string
-	S3Bucket    string
-	S3UseSSL    bool
+	S3 struct {
+		Endpoint  string `mapstructure:"endpoint"`
+		AccessKey string `mapstructure:"access_key"`
+		SecretKey string `mapstructure:"secret_key"`
+		Bucket    string `mapstructure:"bucket"`
+		UseSSL    bool   `mapstructure:"use_ssl"`
+	} `mapstructure:"s3"`
 }
 
 var cfg Config
 
-func main() {
-	cfg = Config{
-		S3Endpoint:  getEnv("S3_ENDPOINT", "minio:9000"),
-		S3AccessKey: getEnv("S3_ACCESS_KEY", ""),
-		S3SecretKey: getEnv("S3_SECRET_KEY", ""),
-		S3Bucket:    getEnv("S3_BUCKET", "gwebssh"),
-		S3UseSSL:    os.Getenv("S3_USE_SSL") == "true",
+func InitConfig() {
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+	viper.AutomaticEnv()
+
+	if err := viper.ReadInConfig(); err != nil {
+		log.Printf("Warning: config file not found, using defaults: %v", err)
 	}
+
+	if err := viper.Unmarshal(&cfg); err != nil {
+		log.Fatalf("Unable to decode config: %v", err)
+	}
+
+	log.Printf("Config loaded: S3.Endpoint=%s, S3.Bucket=%s", cfg.S3.Endpoint, cfg.S3.Bucket)
+}
+
+func main() {
+	InitConfig()
 
 	r := gin.Default()
 
@@ -37,11 +50,4 @@ func main() {
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("failed to start server: %v", err)
 	}
-}
-
-func getEnv(key, defaultVal string) string {
-	if val := os.Getenv(key); val != "" {
-		return val
-	}
-	return defaultVal
 }

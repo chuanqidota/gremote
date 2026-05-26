@@ -41,6 +41,7 @@ declare module 'guacamole-common-js' {
     shade(layer: any, alpha: number): void
     distort(layer: any, a: number, b: number, c: number, d: number, e: number, f: number): void
     scale(scale: number): void
+    onresize: ((width: number, height: number) => void) | null
     flush(callback?: () => void, timestamp?: number, logicalFrames?: number): void
     cancel(): void
     flatten(): HTMLCanvasElement
@@ -169,11 +170,11 @@ declare module 'guacamole-common-js' {
     getPosition(): number
     getDisplay(): Display
     oninstruction: ((opcode: string, args: string[]) => void) | null
-    onprogress: ((duration: number, bytes: number) => void) | null
+    onprogress: ((duration: number, parsedSize: number) => void) | null
     ondurationchange: ((duration: number) => void) | null
     onplay: (() => void) | null
     onpause: (() => void) | null
-    onseek: ((position: number) => void) | null
+    onseek: ((position: number, current: number, total: number) => void) | null
     onerror: ((errorMsg: any) => void) | null
     onload: (() => void) | null
   }

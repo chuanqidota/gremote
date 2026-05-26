@@ -230,3 +230,10 @@ func (a *apiHandle) ListGuacFiles(c *gin.Context) {
 	}
 	response.Success(c, "执行成功", guacFiles)
 }
+
+// GetConfig 获取前端显示配置
+func (a *apiHandle) GetConfig(c *gin.Context) {
+	c.JSON(200, gin.H{
+		"display_mode": config.Conf.Display.DisplayMode,
+	})
+}

@@ -147,6 +147,8 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 				_, message, err := conn.ReadMessage()
 				if err != nil {
 					logger.Error(fmt.Sprintf("RDP WS read error: %s", err.Error()))
+					// WebSocket disconnected, close guacd to unblock WriteWsMsg
+					guacClient.Close()
 					return
 				}
 
@@ -203,6 +205,8 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 			if err := conn.WriteMessage(websocket.TextMessage, []byte(rawInstr)); err != nil {
 				wsMu.Unlock()
 				logger.Error(fmt.Sprintf("RDP WS write error: %s", err.Error()))
+				// WebSocket disconnected, close guacd to unblock ReceiveWsMsg
+				guacClient.Close()
 				return
 			}
 			wsMu.Unlock()

@@ -1,102 +1,68 @@
 <template>
   <div class="playback-page">
     <div class="playback-toolbar">
-      <span class="back-link" @click="$router.back()">← 返回审计日志</span>
-      <span class="toolbar-sep">|</span>
       <span class="toolbar-title">会话回放</span>
       <span class="toolbar-key">{{ key }}</span>
       <span class="toolbar-protocol">{{ protocol === 'rdp' ? 'Windows (RDP)' : 'Linux (SSH)' }}</span>
-    </div>
-
-    <!-- Converting state -->
-    <div v-if="converting" class="loading">
-      <el-icon class="converting-spinner" :size="48"><Loading /></el-icon>
-      <span>正在转换为MP4视频...</span>
-      <span class="converting-hint">首次播放需要转换，转换完成后将自动播放</span>
+      <div class="toolbar-right">
+        <el-button v-if="protocol === 'rdp'" size="small" :title="isFullscreen ? '退出全屏' : '全屏'" @click="toggleFullscreen">
+          <el-icon><FullScreen v-if="!isFullscreen" /><Close v-else /></el-icon>
+        </el-button>
+      </div>
     </div>
 
     <!-- Loading state -->
-    <div v-else-if="loading" class="loading">
-      <span>加载录制中...</span>
+    <div v-if="isRdpLoading" class="loading">
+      <el-progress
+        :percentage="Math.round(guacPlayback.loadingProgress.value * 100)"
+        :stroke-width="8"
+        style="width: 300px"
+      />
+      <span>{{ guacPlayback.loadingLabel.value }}</span>
     </div>
 
     <!-- Error state -->
-    <div v-else-if="error" class="error">
-      <p>{{ error }}</p>
-      <el-button @click="$router.back()">返回</el-button>
+    <div v-else-if="isRdpError" class="error">
+      <p>{{ guacPlayback.error.value }}</p>
+      <div class="error-actions">
+        <el-button @click="handleRetry">重试</el-button>
+        <el-button @click="$router.back()">返回</el-button>
+      </div>
     </div>
 
-    <!-- MP4 Video player -->
-    <template v-else-if="useMP4Player">
-      <div class="player-container">
-        <video
-          ref="videoPlayer"
-          :src="mp4Url"
-          autoplay
-          class="video-player"
-          @loadedmetadata="onVideoLoaded"
-          @timeupdate="onVideoTimeUpdate"
-          @ended="onVideoEnded"
-        />
-      </div>
-      <div class="playback-controls">
-        <el-button size="small" @click="toggleVideoPlay">
-          {{ videoPaused ? '▶ 播放' : '⏸ 暂停' }}
-        </el-button>
-        <el-slider
-          v-model="videoProgress"
-          :max="100"
-          :show-tooltip="false"
-          style="flex: 1"
-          @input="onVideoSeek"
-        />
-        <span class="time-display">{{ formatTime(videoCurrentTime) }} / {{ formatTime(videoDuration) }}</span>
-        <el-select v-model="videoPlaybackSpeed" size="small" style="width: 80px" @change="onVideoSpeedChange">
-          <el-option :value="0.5" label="0.5x" />
-          <el-option :value="1" label="1x" />
-          <el-option :value="2" label="2x" />
-          <el-option :value="5" label="5x" />
-          <el-option :value="10" label="10x" />
-        </el-select>
-      </div>
-    </template>
-
-    <!-- Fallback: original .guac player -->
+    <!-- Player (SSH or RDP) -->
     <template v-else>
       <div ref="playerContainer" class="player-container" />
+      <div v-if="isRdp && guacPlayback.seeking.value" class="seek-overlay">
+        <span>正在跳转... {{ Math.round(guacPlayback.seekProgress.value * 100) }}%</span>
+      </div>
       <div class="playback-controls">
-        <el-button size="small" @click="togglePlay">
-          {{ paused ? '▶ 播放' : '⏸ 暂停' }}
+        <el-button size="small" @click="handleTogglePlay">
+          {{ isRdp ? !guacPlayback.paused.value : !sshPaused ? '⏸ 暂停' : '▶ 播放' }}
         </el-button>
         <el-slider
-          v-model="progress"
+          :model-value="isRdp ? guacPlayback.progress.value : sshProgress"
           :max="100"
-          :show-tooltip="false"
+          :show-tooltip="true"
+          :format-tooltip="formatTooltip"
           style="flex: 1"
-          @input="onSeek"
+          @change="onSeek"
         />
-        <span class="time-display">{{ formatTime(currentTime) }} / {{ formatTime(duration) }}</span>
-        <el-select v-model="playbackSpeed" size="small" style="width: 80px" @change="onSpeedChange">
-          <el-option :value="0.5" label="0.5x" />
-          <el-option :value="1" label="1x" />
-          <el-option :value="2" label="2x" />
-          <el-option :value="5" label="5x" />
-          <el-option :value="10" label="10x" />
-        </el-select>
+        <span class="time-display">{{ formatTime(isRdp ? guacPlayback.currentTime.value : sshCurrentTime) }} / {{ formatTime(isRdp ? guacPlayback.duration.value : sshDuration) }}</span>
       </div>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
-import { Loading } from '@element-plus/icons-vue'
+import { FullScreen, Close } from '@element-plus/icons-vue'
 import { useAudit } from '../composables/useAudit'
-import { getConvertStatus, triggerConvert, getRecordFileMP4Url } from '../api'
+import { useGuacPlayback } from '../composables/useGuacPlayback'
 
 interface AsciinemaEvent {
   time: number
@@ -104,47 +70,28 @@ interface AsciinemaEvent {
   data: string
 }
 
-interface GuacInstruction {
-  opcode: string
-  args: string[]
-  time: number
-}
-
-interface StreamAccumulator {
-  mimetype: string
-  x: number
-  y: number
-  channelMask: number
-  layerIndex: number
-  chunks: string[]
-}
-
 const route = useRoute()
 const key = route.query.key as string
 const protocol = (route.query.protocol as string) || 'ssh'
+const isRdp = protocol === 'rdp'
 
 const { fetchRecordUrl, fetchGuacRecordUrl } = useAudit()
+const guacPlayback = useGuacPlayback()
+
 const playerContainer = ref<HTMLDivElement>()
-const loading = ref(true)
-const converting = ref(false)
-const error = ref('')
-const useMP4Player = ref(false)
-const mp4Url = ref('')
-const videoPlayer = ref<HTMLVideoElement>()
+const isFullscreen = ref(false)
 
-// MP4 video player state
-const videoPaused = ref(false)
-const videoProgress = ref(0)
-const videoCurrentTime = ref(0)
-const videoDuration = ref(0)
-const videoPlaybackSpeed = ref(1)
+// SSH-specific state (only used for SSH playback)
+const sshLoading = ref(true)
+const sshError = ref('')
+const sshPaused = ref(true)
+const sshProgress = ref(0)
+const sshCurrentTime = ref(0)
+const sshDuration = ref(0)
 
-// Original .guac player state
-const paused = ref(false)
-const progress = ref(0)
-const currentTime = ref(0)
-const duration = ref(0)
-const playbackSpeed = ref(1)
+// Derived state for template
+const isRdpLoading = computed(() => isRdp && guacPlayback.loading.value)
+const isRdpError = computed(() => isRdp && guacPlayback.error.value)
 
 let terminal: Terminal | null = null
 let fitAddon: FitAddon | null = null
@@ -156,38 +103,83 @@ let eventIndex = 0
 let headerCols = 80
 let headerRows = 24
 
-// Guac playback state
-let guacInstructions: GuacInstruction[] = []
-let guacEventIndex = 0
-let guacDisplay: any = null
-let guacLayers: Map<number, any> = new Map()
-let guacStreamAccumulators: Map<number, StreamAccumulator> = new Map()
-let pollTimer: ReturnType<typeof setTimeout> | null = null
-
 onMounted(async () => {
   if (!key) {
-    error.value = '缺少 key 参数'
-    loading.value = false
+    sshError.value = '缺少 key 参数'
+    sshLoading.value = false
     return
   }
 
   try {
-    if (protocol === 'rdp') {
-      await initRDPPlayback()
+    if (isRdp) {
+      await guacPlayback.load(fetchGuacRecordUrl(key), () => playerContainer.value)
     } else {
       await playAsciinemaRecording()
     }
   } catch (e: any) {
-    error.value = e?.message || '加载录制失败'
-    loading.value = false
+    if (isRdp) {
+      guacPlayback.error.value = e?.message || '加载录制失败'
+      guacPlayback.loading.value = false
+    } else {
+      sshError.value = e?.message || '加载录制失败'
+      sshLoading.value = false
+    }
   }
+
+  document.addEventListener('keydown', onKeydown)
+  document.addEventListener('fullscreenchange', onFullscreenChange)
+  window.addEventListener('resize', onResize)
 })
 
 onBeforeUnmount(() => {
   clearAllTimers()
-  if (pollTimer) clearTimeout(pollTimer)
+  guacPlayback.destroy()
   terminal?.dispose()
+  document.removeEventListener('keydown', onKeydown)
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
+  window.removeEventListener('resize', onResize)
 })
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.code === 'Space' && isRdp) {
+    e.preventDefault()
+    guacPlayback.togglePlay()
+  }
+}
+
+function onFullscreenChange() {
+  isFullscreen.value = !!document.fullscreenElement
+  const toolbarEl = document.querySelector('.playback-toolbar') as HTMLElement
+  if (toolbarEl) {
+    toolbarEl.style.display = isFullscreen.value ? 'none' : 'flex'
+  }
+  const controlsEl = document.querySelector('.playback-controls') as HTMLElement
+  if (controlsEl) {
+    controlsEl.style.display = isFullscreen.value ? 'none' : 'flex'
+  }
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      guacPlayback.fitDisplay()
+    })
+  })
+}
+
+let resizeTimer: ReturnType<typeof setTimeout> | null = null
+function onResize() {
+  if (resizeTimer) clearTimeout(resizeTimer)
+  resizeTimer = setTimeout(() => {
+    guacPlayback.fitDisplay()
+    fitAddon?.fit()
+  }, 100)
+}
+
+function toggleFullscreen() {
+  if (document.fullscreenElement) {
+    document.exitFullscreen()
+  } else {
+    document.documentElement.requestFullscreen()
+  }
+}
 
 function clearAllTimers() {
   timerIds.forEach(id => clearTimeout(id))
@@ -210,131 +202,68 @@ function parseAsciinemaData(raw: string): { header: any; events: AsciinemaEvent[
 }
 
 function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60)
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
   const s = Math.floor(seconds % 60)
+  if (h > 0) {
+    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  }
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-// ============ MP4 Video Player ============
-
-function onVideoLoaded() {
-  if (!videoPlayer.value) return
-  videoDuration.value = videoPlayer.value.duration
-  loading.value = false
+function formatTooltip(val: number): string {
+  const dur: number = isRdp ? guacPlayback.duration.value : sshDuration.value
+  const seconds = (val / 100) * dur
+  return formatTime(seconds)
 }
 
-function onVideoTimeUpdate() {
-  if (!videoPlayer.value) return
-  videoCurrentTime.value = videoPlayer.value.currentTime
-  videoProgress.value = videoDuration.value > 0
-    ? (videoPlayer.value.currentTime / videoDuration.value) * 100
-    : 0
-}
+// ============ RDP ============
 
-function onVideoEnded() {
-  videoPaused.value = true
-}
-
-function toggleVideoPlay() {
-  if (!videoPlayer.value) return
-  if (videoPaused.value) {
-    videoPlayer.value.play()
-    videoPaused.value = false
+function handleTogglePlay() {
+  if (isRdp) {
+    guacPlayback.togglePlay()
   } else {
-    videoPlayer.value.pause()
-    videoPaused.value = true
-  }
-}
-
-function onVideoSeek(pos: number) {
-  if (!videoPlayer.value || videoDuration.value <= 0) return
-  videoPlayer.value.currentTime = (pos / 100) * videoDuration.value
-}
-
-function onVideoSpeedChange() {
-  if (!videoPlayer.value) return
-  videoPlayer.value.playbackRate = videoPlaybackSpeed.value
-}
-
-// ============ RDP Init with MP4 conversion ============
-
-async function initRDPPlayback() {
-  // Check if MP4 already exists
-  const status = await getConvertStatus(key)
-  if (status.converted && status.mp4_url) {
-    mp4Url.value = status.mp4_url
-    useMP4Player.value = true
-    loading.value = false
-    return
-  }
-
-  // Trigger conversion
-  converting.value = true
-  loading.value = false
-  await triggerConvert(key)
-
-  // Poll for completion
-  startPolling()
-}
-
-function startPolling() {
-  if (pollTimer) clearTimeout(pollTimer)
-  pollTimer = setTimeout(async () => {
-    try {
-      const status = await getConvertStatus(key)
-      if (status.converted && status.mp4_url) {
-        // Conversion complete
-        mp4Url.value = status.mp4_url
-        useMP4Player.value = true
-        converting.value = false
-        return
-      }
-      if (!status.converting) {
-        // Conversion failed or stopped, fallback to .guac player
-        converting.value = false
-        await playGuacRecording()
-        return
-      }
-      // Still converting, poll again
-      startPolling()
-    } catch {
-      // On error, fallback to .guac player
-      converting.value = false
-      await playGuacRecording()
+    if (sshPaused.value) {
+      resumePlayback()
+    } else {
+      pausePlayback()
     }
-  }, 3000)
-}
-
-// ============ Original .guac Player (fallback) ============
-
-function togglePlay() {
-  if (paused.value) {
-    resumePlayback()
-  } else {
-    pausePlayback()
   }
 }
+
+function onSeek(pos: number) {
+  if (isRdp) {
+    guacPlayback.seek(pos as number)
+  } else {
+    onTerminalSeek(pos as number)
+  }
+}
+
+function handleRetry() {
+  guacPlayback.error.value = ''
+  guacPlayback.loading.value = true
+  guacPlayback.loadingProgress.value = 0
+  guacPlayback.loadingLabel.value = '正在加载录制文件...'
+  guacPlayback.load(fetchGuacRecordUrl(key), () => playerContainer.value).catch((e: any) => {
+    guacPlayback.error.value = e?.message || '加载录制失败'
+    guacPlayback.loading.value = false
+  })
+}
+
+// ============ SSH: Terminal-based asciinema playback ============
 
 function pausePlayback() {
-  paused.value = true
+  sshPaused.value = true
   pausedAt = performance.now()
   clearAllTimers()
 }
 
 function resumePlayback() {
-  if (protocol === 'rdp') {
-    if (guacInstructions.length === 0) return
-  } else {
-    if (!terminal || events.length === 0) return
-  }
-  paused.value = false
+  if (!terminal || events.length === 0) return
+  sshPaused.value = false
   const pauseDuration = performance.now() - pausedAt
   startTime += pauseDuration
-  if (protocol === 'rdp') {
-    scheduleRemainingGuacEvents()
-  } else {
-    scheduleRemainingEvents()
-  }
+  scheduleRemainingEvents()
 }
 
 function scheduleRemainingEvents() {
@@ -342,14 +271,14 @@ function scheduleRemainingEvents() {
   const now = performance.now()
   while (eventIndex < events.length) {
     const ev = events[eventIndex]
-    const delay = (ev.time * 1000 / playbackSpeed.value) - (now - startTime)
+    const delay = (ev.time * 1000) - (now - startTime)
     if (delay > 0) {
       const tid = window.setTimeout(() => {
-        if (!paused.value) {
+        if (!sshPaused.value) {
           writeEvent(ev)
           eventIndex++
-          currentTime.value = ev.time
-          progress.value = duration.value > 0 ? (ev.time / duration.value) * 100 : 0
+          sshCurrentTime.value = ev.time
+          sshProgress.value = sshDuration.value > 0 ? (ev.time / sshDuration.value) * 100 : 0
           scheduleRemainingEvents()
         }
       }, delay)
@@ -358,58 +287,22 @@ function scheduleRemainingEvents() {
     }
     writeEvent(ev)
     eventIndex++
-    currentTime.value = ev.time
+    sshCurrentTime.value = ev.time
   }
-  progress.value = 100
-}
-
-function scheduleRemainingGuacEvents() {
-  clearAllTimers()
-  const now = performance.now()
-  while (guacEventIndex < guacInstructions.length) {
-    const inst = guacInstructions[guacEventIndex]
-    const delay = (inst.time * 1000 / playbackSpeed.value) - (now - startTime)
-    if (delay > 0) {
-      const tid = window.setTimeout(() => {
-        if (!paused.value) {
-          processGuacInstruction(inst)
-          guacEventIndex++
-          currentTime.value = inst.time
-          progress.value = duration.value > 0 ? (inst.time / duration.value) * 100 : 0
-          scheduleRemainingGuacEvents()
-        }
-      }, delay)
-      timerIds.push(tid)
-      return
-    }
-    processGuacInstruction(inst)
-    guacEventIndex++
-    currentTime.value = inst.time
-  }
-  progress.value = 100
+  sshProgress.value = 100
 }
 
 function writeEvent(ev: AsciinemaEvent) {
   if (!terminal) return
   if (ev.type === 'o') {
     terminal.write(ev.data)
-  } else if (ev.type === 'i') {
-    // input events are not shown during playback
-  }
-}
-
-function onSeek(pos: number) {
-  if (protocol === 'rdp') {
-    onGuacSeek(pos)
-  } else {
-    onTerminalSeek(pos)
   }
 }
 
 function onTerminalSeek(pos: number) {
-  if (duration.value <= 0 || events.length === 0) return
+  if (sshDuration.value <= 0 || events.length === 0) return
   clearAllTimers()
-  const targetTime = (pos / 100) * duration.value
+  const targetTime = (pos / 100) * sshDuration.value
   terminal?.clear()
   terminal?.reset()
   eventIndex = 0
@@ -419,449 +312,11 @@ function onTerminalSeek(pos: number) {
     accumulated = events[eventIndex].time
     eventIndex++
   }
-  currentTime.value = accumulated
-  progress.value = pos
-  startTime = performance.now() - (accumulated * 1000 / playbackSpeed.value)
-  if (!paused.value) {
+  sshCurrentTime.value = accumulated
+  sshProgress.value = pos
+  startTime = performance.now() - (accumulated * 1000)
+  if (!sshPaused.value) {
     scheduleRemainingEvents()
-  }
-}
-
-function onGuacSeek(pos: number) {
-  if (duration.value <= 0 || guacInstructions.length === 0) return
-  clearAllTimers()
-  const targetTime = (pos / 100) * duration.value
-
-  // Reset display
-  if (guacDisplay) {
-    const defaultLayer = guacDisplay.getDefaultLayer()
-    const canvas = defaultLayer.getCanvas()
-    const ctx = canvas.getContext('2d')
-    if (ctx) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-    }
-  }
-  guacStreamAccumulators.clear()
-  guacLayers.clear()
-
-  // Replay from start up to target time
-  guacEventIndex = 0
-  let accumulated = 0
-  while (guacEventIndex < guacInstructions.length && guacInstructions[guacEventIndex].time <= targetTime) {
-    processGuacInstruction(guacInstructions[guacEventIndex])
-    accumulated = guacInstructions[guacEventIndex].time
-    guacEventIndex++
-  }
-  currentTime.value = accumulated
-  progress.value = pos
-  startTime = performance.now() - (accumulated * 1000 / playbackSpeed.value)
-  if (!paused.value) {
-    scheduleRemainingGuacEvents()
-  }
-}
-
-function onSpeedChange() {
-  if (protocol === 'rdp') {
-    if (!paused.value && guacInstructions.length > 0) {
-      startTime = performance.now() - (currentTime.value * 1000 / playbackSpeed.value)
-      scheduleRemainingGuacEvents()
-    }
-  } else {
-    if (!paused.value && events.length > 0) {
-      startTime = performance.now() - (currentTime.value * 1000 / playbackSpeed.value)
-      scheduleRemainingEvents()
-    }
-  }
-}
-
-function getGuacLayer(index: number, display: any): any {
-  if (guacLayers.has(index)) return guacLayers.get(index)
-  let layer: any
-  if (index === 0) {
-    layer = display.getDefaultLayer()
-  } else if (index > 0) {
-    layer = display.createLayer()
-  } else {
-    layer = display.createBuffer()
-  }
-  guacLayers.set(index, layer)
-  return layer
-}
-
-function processGuacInstruction(inst: GuacInstruction) {
-  if (!guacDisplay) return
-  const args = inst.args
-  const display = guacDisplay
-
-  switch (inst.opcode) {
-    case 'size': {
-      const layerIndex = parseInt(args[0])
-      const w = parseInt(args[1])
-      const h = parseInt(args[2])
-      const layer = getGuacLayer(layerIndex, display)
-      layer.resize(w, h)
-      if (layerIndex === 0) {
-        const displayEl = display.getElement()
-        const innerDisplay = displayEl.firstChild as HTMLElement
-        if (innerDisplay) {
-          innerDisplay.style.width = w + 'px'
-          innerDisplay.style.height = h + 'px'
-        }
-        displayEl.style.width = w + 'px'
-        displayEl.style.height = h + 'px'
-      }
-      break
-    }
-    case 'img': {
-      const streamIndex = parseInt(args[0])
-      const channelMask = parseInt(args[1])
-      const layerIndex = parseInt(args[2])
-      const mimetype = args[3]
-      const x = parseInt(args[4])
-      const y = parseInt(args[5])
-      guacStreamAccumulators.set(streamIndex, {
-        mimetype, x, y, channelMask, layerIndex, chunks: [],
-      })
-      break
-    }
-    case 'blob': {
-      const streamIndex = parseInt(args[0])
-      const data = args[1]
-      const acc = guacStreamAccumulators.get(streamIndex)
-      if (acc) acc.chunks.push(data)
-      break
-    }
-    case 'end': {
-      const streamIndex = parseInt(args[0])
-      const acc = guacStreamAccumulators.get(streamIndex)
-      if (acc && acc.chunks.length > 0) {
-        drawStreamImage(acc, display)
-      }
-      guacStreamAccumulators.delete(streamIndex)
-      break
-    }
-    case 'jpeg': {
-      const channelMask = parseInt(args[0])
-      const layerIndex = parseInt(args[1])
-      const x = parseInt(args[2])
-      const y = parseInt(args[3])
-      const data = args[4]
-      const layer = getGuacLayer(layerIndex, display)
-      const url = 'data:image/jpeg;base64,' + data
-      const img = new Image()
-      img.onload = () => layer.drawImage(x, y, img)
-      img.src = url
-      break
-    }
-    case 'png': {
-      const channelMask = parseInt(args[0])
-      const layerIndex = parseInt(args[1])
-      const x = parseInt(args[2])
-      const y = parseInt(args[3])
-      const data = args[4]
-      const layer = getGuacLayer(layerIndex, display)
-      const url = 'data:image/png;base64,' + data
-      const img = new Image()
-      img.onload = () => layer.drawImage(x, y, img)
-      img.src = url
-      break
-    }
-    case 'cursor': {
-      const hotspotX = parseInt(args[0])
-      const hotspotY = parseInt(args[1])
-      const srcLayerIndex = parseInt(args[2])
-      const srcX = parseInt(args[3])
-      const srcY = parseInt(args[4])
-      const srcWidth = parseInt(args[5])
-      const srcHeight = parseInt(args[6])
-      const srcLayer = getGuacLayer(srcLayerIndex, display)
-      display.setCursor(hotspotX, hotspotY, srcLayer, srcX, srcY, srcWidth, srcHeight)
-      break
-    }
-    case 'mouse': {
-      const x = parseInt(args[0])
-      const y = parseInt(args[1])
-      display.showCursor(true)
-      display.moveCursor(x, y)
-      break
-    }
-    case 'cfill': {
-      const channelMask = parseInt(args[0])
-      const layerIndex = parseInt(args[1])
-      const r = parseInt(args[2])
-      const g = parseInt(args[3])
-      const b = parseInt(args[4])
-      const a = parseInt(args[5])
-      const layer = getGuacLayer(layerIndex, display)
-      layer.setChannelMask(channelMask)
-      layer.fillColor(r, g, b, a)
-      break
-    }
-    case 'cstroke': {
-      const channelMask = parseInt(args[0])
-      const layerIndex = parseInt(args[1])
-      const cap = ['butt', 'round', 'square'][parseInt(args[2])]
-      const join = ['bevel', 'miter', 'round'][parseInt(args[3])]
-      const thickness = parseInt(args[4])
-      const r = parseInt(args[5])
-      const g = parseInt(args[6])
-      const b = parseInt(args[7])
-      const a = parseInt(args[8])
-      const layer = getGuacLayer(layerIndex, display)
-      layer.setChannelMask(channelMask)
-      layer.strokeColor(cap, join, thickness, r, g, b, a)
-      break
-    }
-    case 'setChannelMask': {
-      const layerIndex = parseInt(args[0])
-      const mask = parseInt(args[1])
-      const layer = getGuacLayer(layerIndex, display)
-      layer.setChannelMask(mask)
-      break
-    }
-    case 'identity': {
-      const layerIndex = parseInt(args[0])
-      const layer = getGuacLayer(layerIndex, display)
-      layer.setTransform(1, 0, 0, 1, 0, 0)
-      break
-    }
-    case 'setTransform': {
-      const layerIndex = parseInt(args[0])
-      const a = parseFloat(args[1])
-      const b = parseFloat(args[2])
-      const c = parseFloat(args[3])
-      const d = parseFloat(args[4])
-      const e = parseFloat(args[5])
-      const f = parseFloat(args[6])
-      const layer = getGuacLayer(layerIndex, display)
-      layer.setTransform(a, b, c, d, e, f)
-      break
-    }
-    case 'transform': {
-      const layerIndex = parseInt(args[0])
-      const a = parseFloat(args[1])
-      const b = parseFloat(args[2])
-      const c = parseFloat(args[3])
-      const d = parseFloat(args[4])
-      const e = parseFloat(args[5])
-      const f = parseFloat(args[6])
-      const layer = getGuacLayer(layerIndex, display)
-      layer.transform(a, b, c, d, e, f)
-      break
-    }
-    case 'start': {
-      const layerIndex = parseInt(args[0])
-      const x = parseInt(args[1])
-      const y = parseInt(args[2])
-      const layer = getGuacLayer(layerIndex, display)
-      layer.moveTo(x, y)
-      break
-    }
-    case 'line': {
-      const layerIndex = parseInt(args[0])
-      const x = parseInt(args[1])
-      const y = parseInt(args[2])
-      const layer = getGuacLayer(layerIndex, display)
-      layer.lineTo(x, y)
-      break
-    }
-    case 'close': {
-      const layerIndex = parseInt(args[0])
-      const layer = getGuacLayer(layerIndex, display)
-      layer.close()
-      break
-    }
-    case 'rect': {
-      const layerIndex = parseInt(args[0])
-      const x = parseInt(args[1])
-      const y = parseInt(args[2])
-      const w = parseInt(args[3])
-      const h = parseInt(args[4])
-      const layer = getGuacLayer(layerIndex, display)
-      layer.rect(x, y, w, h)
-      break
-    }
-    case 'clip': {
-      const layerIndex = parseInt(args[0])
-      const layer = getGuacLayer(layerIndex, display)
-      layer.clip()
-      break
-    }
-    case 'push': {
-      const layerIndex = parseInt(args[0])
-      const layer = getGuacLayer(layerIndex, display)
-      layer.push()
-      break
-    }
-    case 'pop': {
-      const layerIndex = parseInt(args[0])
-      const layer = getGuacLayer(layerIndex, display)
-      layer.pop()
-      break
-    }
-    case 'reset': {
-      const layerIndex = parseInt(args[0])
-      const layer = getGuacLayer(layerIndex, display)
-      layer.reset()
-      break
-    }
-    case 'move': {
-      const layerIndex = parseInt(args[0])
-      const parentIndex = parseInt(args[1])
-      const x = parseInt(args[2])
-      const y = parseInt(args[3])
-      const z = parseInt(args[4])
-      if (layerIndex > 0 && parentIndex >= 0) {
-        const layer = getGuacLayer(layerIndex, display)
-        const parent = getGuacLayer(parentIndex, display)
-        layer.move(parent, x, y, z)
-      }
-      break
-    }
-    case 'dispose': {
-      const layerIndex = parseInt(args[0])
-      if (layerIndex > 0) {
-        const layer = getGuacLayer(layerIndex, display)
-        layer.dispose()
-        guacLayers.delete(layerIndex)
-      }
-      break
-    }
-    case 'shade': {
-      const layerIndex = parseInt(args[0])
-      const alpha = parseInt(args[1])
-      if (layerIndex >= 0) {
-        const layer = getGuacLayer(layerIndex, display)
-        layer.shade(alpha)
-      }
-      break
-    }
-    case 'distort': {
-      const layerIndex = parseInt(args[0])
-      const a = parseFloat(args[1])
-      const b = parseFloat(args[2])
-      const c = parseFloat(args[3])
-      const d = parseFloat(args[4])
-      const e = parseFloat(args[5])
-      const f = parseFloat(args[6])
-      if (layerIndex >= 0) {
-        const layer = getGuacLayer(layerIndex, display)
-        layer.distort(a, b, c, d, e, f)
-      }
-      break
-    }
-    case 'copy': {
-      const srcL = getGuacLayer(parseInt(args[0]), display)
-      const srcX = parseInt(args[1])
-      const srcY = parseInt(args[2])
-      const srcW = parseInt(args[3])
-      const srcH = parseInt(args[4])
-      const channelMask = parseInt(args[5])
-      const dstL = getGuacLayer(parseInt(args[6]), display)
-      const dstX = parseInt(args[7])
-      const dstY = parseInt(args[8])
-      dstL.setChannelMask(channelMask)
-      dstL.copy(srcL, srcX, srcY, srcW, srcH, dstX, dstY)
-      break
-    }
-    case 'put': {
-      const srcL = getGuacLayer(parseInt(args[0]), display)
-      const srcX = parseInt(args[1])
-      const srcY = parseInt(args[2])
-      const srcW = parseInt(args[3])
-      const srcH = parseInt(args[4])
-      const dstL = getGuacLayer(parseInt(args[5]), display)
-      const dstX = parseInt(args[6])
-      const dstY = parseInt(args[7])
-      dstL.put(srcL, srcX, srcY, srcW, srcH, dstX, dstY)
-      break
-    }
-    case 'transfer': {
-      const srcL = getGuacLayer(parseInt(args[0]), display)
-      const srcX = parseInt(args[1])
-      const srcY = parseInt(args[2])
-      const srcW = parseInt(args[3])
-      const srcH = parseInt(args[4])
-      const funcIndex = parseInt(args[5])
-      const dstL = getGuacLayer(parseInt(args[6]), display)
-      const dstX = parseInt(args[7])
-      const dstY = parseInt(args[8])
-      // Guacamole default transfer functions
-      const transferFunctions: Record<number, (src: any, dst: any) => void> = {
-        0: (src, dst) => { dst.red = dst.green = dst.blue = 0 },
-        15: (src, dst) => { dst.red = dst.green = dst.blue = 255 },
-        3: (src, dst) => { dst.red = src.red; dst.green = src.green; dst.blue = src.blue },
-        12: (src, dst) => { dst.red = src.red; dst.green = src.green; dst.blue = src.blue; dst.alpha = src.alpha },
-      }
-      const fn = transferFunctions[funcIndex]
-      if (fn) {
-        dstL.transfer(srcL, srcX, srcY, srcW, srcH, dstX, dstY, fn)
-      }
-      break
-    }
-    case 'set': {
-      const layerIndex = parseInt(args[0])
-      const name = args[1]
-      const value = args[2]
-      const layer = getGuacLayer(layerIndex, display)
-      if (name === 'miter-limit') {
-        layer.setMiterLimit?.(parseFloat(value))
-      }
-      break
-    }
-    case 'sync': {
-      // No-op for playback — sync is only needed for live connections
-      break
-    }
-    case 'body':
-    case 'file':
-    case 'clipboard':
-    case 'pipe':
-    case 'audio':
-    case 'video':
-    case 'msg':
-    case 'name':
-    case 'error':
-    case 'disconnect':
-    case 'nop':
-    case 'nest':
-    case 'required':
-    case 'argv':
-    case 'filesystem':
-    case 'key':
-    case 'optimize':
-      // Ignored for playback
-      break
-    default:
-      // Unknown instruction — ignore
-      break
-  }
-}
-
-function drawStreamImage(acc: StreamAccumulator, display: any) {
-  const base64 = acc.chunks.join('')
-  try {
-    const byteString = atob(base64)
-    const ab = new ArrayBuffer(byteString.length)
-    const ia = new Uint8Array(ab)
-    for (let i = 0; i < byteString.length; i++) {
-      ia[i] = byteString.charCodeAt(i)
-    }
-    const blob = new Blob([ab], { type: acc.mimetype })
-    const url = URL.createObjectURL(blob)
-    const img = new Image()
-    img.onload = () => {
-      const layer = getGuacLayer(acc.layerIndex, display)
-      layer.drawImage(acc.x, acc.y, img)
-      URL.revokeObjectURL(url)
-    }
-    img.onerror = () => {
-      console.error('[Playback] Image load error for', acc.mimetype, 'blob size:', blob.size)
-      URL.revokeObjectURL(url)
-    }
-    img.src = url
-  } catch (e) {
-    console.error('[Playback] Failed to decode image stream:', e)
   }
 }
 
@@ -883,9 +338,9 @@ async function playAsciinemaRecording() {
   if (events.length === 0) {
     throw new Error('录制数据中没有事件')
   }
-  duration.value = events[events.length - 1].time
+  sshDuration.value = events[events.length - 1].time
 
-  loading.value = false
+  sshLoading.value = false
   await nextTick()
   if (!playerContainer.value) return
 
@@ -913,68 +368,6 @@ async function playAsciinemaRecording() {
   eventIndex = 0
   scheduleRemainingEvents()
 }
-
-async function playGuacRecording() {
-  const { default: Guacamole } = await import('guacamole-common-js')
-
-  const url = fetchGuacRecordUrl(key)
-  const response = await fetch(url)
-  if (!response.ok) {
-    let msg = `HTTP ${response.status}: ${response.statusText}`
-    try {
-      const errBody = await response.text()
-      if (errBody) msg += ` - ${errBody}`
-    } catch {}
-    throw new Error(msg)
-  }
-
-  const arrayBuffer = await response.arrayBuffer()
-  if (arrayBuffer.byteLength === 0) {
-    throw new Error('录制文件为空')
-  }
-
-  const decoder = new TextDecoder('latin1')
-  const recordingText = decoder.decode(arrayBuffer)
-
-  const parser = new Guacamole.Parser()
-  const rawInstructions: Array<{ opcode: string; args: string[] }> = []
-  parser.oninstruction = (opcode: string, args: string[]) => {
-    rawInstructions.push({ opcode, args: [...args] })
-  }
-  parser.receive(recordingText)
-
-  if (rawInstructions.length === 0) {
-    throw new Error('录制数据中没有有效指令')
-  }
-
-  // Assign timestamps from sync instructions for playback timing
-  let currentTimeAccum = 0
-  guacInstructions = rawInstructions.map(inst => {
-    if (inst.opcode === 'sync') {
-      currentTimeAccum += 0.1 // 100ms between syncs as default frame interval
-    }
-    return { ...inst, time: currentTimeAccum }
-  })
-
-  duration.value = currentTimeAccum > 0 ? currentTimeAccum : rawInstructions.length * 0.01
-
-  loading.value = false
-  await nextTick()
-
-  if (!playerContainer.value) return
-
-  // Create Display directly — bypass Client to avoid async task system
-  guacDisplay = new Guacamole.Display()
-  const displayElement = guacDisplay.getElement()
-  displayElement.style.margin = '0 auto'
-  displayElement.style.display = 'block'
-  playerContainer.value.appendChild(displayElement)
-
-  // Start playback
-  startTime = performance.now()
-  guacEventIndex = 0
-  scheduleRemainingGuacEvents()
-}
 </script>
 
 <style scoped>
@@ -995,17 +388,6 @@ async function playGuacRecording() {
   flex-shrink: 0;
 }
 
-.back-link {
-  font-size: 12px;
-  color: #ccc;
-  cursor: pointer;
-}
-
-.toolbar-sep {
-  color: #555;
-  font-size: 12px;
-}
-
 .toolbar-title {
   font-size: 12px;
   color: #d4d4d4;
@@ -1024,6 +406,13 @@ async function playGuacRecording() {
   border-radius: 2px;
 }
 
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  align-items: center;
+}
+
 .loading,
 .error {
   display: flex;
@@ -1036,6 +425,11 @@ async function playGuacRecording() {
   font-size: 16px;
 }
 
+.error-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .player-container {
   flex: 1;
   min-height: 0;
@@ -1043,6 +437,20 @@ async function playGuacRecording() {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+}
+
+.seek-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 10;
+  pointer-events: none;
 }
 
 .playback-controls {
@@ -1060,26 +468,5 @@ async function playGuacRecording() {
   color: #909399;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-.video-player {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.converting-spinner {
-  animation: spin 1s linear infinite;
-  color: #409eff;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.converting-hint {
-  font-size: 12px;
-  color: #909399;
 }
 </style>

@@ -114,9 +114,8 @@ func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool, key stri
 			// 接受ws消息
 			_, message, err := ws.ReadMessage()
 			if err != nil {
-				t.wsMu.Lock()
-				_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("读取信息出错-%s", err.Error())))
-				t.wsMu.Unlock()
+				// WebSocket连接断开，主动关闭quitChan
+				setQuit(quitChan)
 				return
 			}
 			// 解析ws消息
@@ -169,9 +168,18 @@ func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool, esDataChan
 			t.ComboOutput.mu.Unlock()
 
 			t.wsMu.Lock()
-			_ = ws.WriteMessage(websocket.TextMessage, data)
+			err := ws.WriteMessage(websocket.TextMessage, data)
 			t.wsMu.Unlock()
-			esDataChan <- data
+			if err != nil {
+				// WebSocket连接断开，主动关闭quitChan
+				setQuit(quitChan)
+				return
+			}
+			// 非阻塞写入ES，避免ES慢/不可用时阻塞WebSocket输出
+			select {
+			case esDataChan <- data:
+			default:
+			}
 		}
 	}
 }
@@ -192,13 +200,19 @@ func (t *Terminal) WriteEsData(quitChan chan bool, key string, startTime time.Ti
 // SessionWait 等待session结束
 func (t *Terminal) SessionWait(quitChan chan bool) {
 	defer setQuit(quitChan)
+	// 等待SSH会话结束或WebSocket断开
+	done := make(chan error, 1)
+	go func() {
+		done <- t.Session.Wait()
+	}()
 	select {
-	case <-quitChan:
-		return
-	default:
-		if err := t.Session.Wait(); err != nil {
+	case err := <-done:
+		if err != nil {
 			logger.Error("session-wait失败-%s", err.Error())
 		}
+	case <-quitChan:
+		// WebSocket已断开，主动关闭SSH会话
+		t.Close()
 	}
 }
 

@@ -31,4 +31,8 @@ node_modules/
 dist/
 .env
 
+# 配置文件（包含敏感信息）
+backend/config/config.yaml
+guac-worker/config.yaml
+
 *.log

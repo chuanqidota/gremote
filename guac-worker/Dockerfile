@@ -11,7 +11,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /recordings
+WORKDIR /app
+COPY config.yaml /app/config.yaml
+RUN mkdir -p /recordings
 VOLUME /recordings
 
 EXPOSE 8080

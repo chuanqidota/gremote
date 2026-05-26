@@ -2,8 +2,9 @@ package config
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"gremote/pkg/logger"
+
+	"github.com/spf13/viper"
 )
 
 type ServerConfig struct {
@@ -64,6 +65,10 @@ type LoggerConfig struct {
 	MaxAge     int    `yaml:"MaxAge" comment:"旧日志最长保留天数"`
 }
 
+type DisplayConfig struct {
+	DisplayMode string `yaml:"DisplayMode" comment:"前端显示模式：all(全部) | linux(仅Linux) | windows(仅Windows)"`
+}
+
 type Config struct {
 	Server        ServerConfig     `yaml:"Server"`
 	Redis         RedisConfig      `yaml:"Redis"`
@@ -73,6 +78,7 @@ type Config struct {
 	Guacd         GuacdConfig      `yaml:"Guacd"`
 	GuacWorker    GuacWorkerConfig `yaml:"GuacWorker"`
 	Logger        LoggerConfig     `yaml:"Logger"`
+	Display       DisplayConfig    `yaml:"Display"`
 }
 
 var Conf = new(Config)

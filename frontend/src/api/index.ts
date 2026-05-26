@@ -57,3 +57,8 @@ export async function getConvertStatus(key: string): Promise<{ converted: boolea
 export async function triggerConvert(key: string): Promise<void> {
   await http.post('/convert-guac', null, { params: { key } })
 }
+
+export async function getConfig(): Promise<{ display_mode: string }> {
+  const { data } = await http.get('/config')
+  return data
+}

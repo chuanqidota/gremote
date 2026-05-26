@@ -5,29 +5,33 @@ Server:
   ReadTimeout: 60
   WriteTimeout: 60
   ShutdownTimeout: 5
-  InsecureSkipVerify: true
+  InsecureSkipVerify: false
+
 Redis:
-  Addr: 127.0.0.1:6379
+  Addr: redis:6379
   Password: ""
   DB: 0
+
 ElasticSearch:
-  Url: http://127.0.0.1:9200
+  Url: http://elasticsearch:9200
   Username: ""
   Password: ""
+
 Audit:
   LoginAuditIndex: gremote-login
   RecordAuditIndex: gremote-record
+
 S3:
-  Endpoint: 127.0.0.1:9000
-  AccessKeyID: "L1JigY9oU7lr9GyCQv14"
-  SecretAccessKey: "6DoFFEy7t2iuSguyMB80sozKBGjbDGIvT8Tn6HWK"
+  Endpoint: minio:9000
+  AccessKeyID: ""
+  SecretAccessKey: ""
   UseSSL: false
   Bucket: gremote
 
 Guacd:
-  Host: 127.0.0.1
+  Host: guacd
   Port: 4822
-  RecordingPath: /tmp/recordings
+  RecordingPath: /opt/recordings
   GuacdPath: /recordings
   DefaultWidth: 1024
   DefaultHeight: 768
@@ -35,7 +39,7 @@ Guacd:
   SessionTimeout: 86400
 
 GuacWorker:
-  URL: http://127.0.0.1:8081
+  URL: http://guac-worker:8080
   Timeout: 300
 
 Logger:
@@ -43,6 +47,3 @@ Logger:
   MaxSize: 10
   MaxBackups: 5
   MaxAge: 7
-
-Display:
-  DisplayMode: all    # all | linux | windows

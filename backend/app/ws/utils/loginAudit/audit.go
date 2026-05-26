@@ -71,12 +71,23 @@ func (e *EsAudit) ReadData(data params.LoginAuditQuery) ([]map[string]any, int64
 			},
 		})
 	}
-	if protocol != "" {
+	if protocol == "all" {
+		// Show all protocols (both SSH and RDP)
+	} else if protocol == "rdp" {
 		must = append(must, map[string]any{
-			"term": map[string]string{"protocol": protocol},
+			"term": map[string]string{"protocol": "rdp"},
+		})
+	} else if protocol == "ssh" {
+		// SSH records have no protocol field, exclude RDP
+		must = append(must, map[string]any{
+			"bool": map[string]any{
+				"must_not": []map[string]any{
+					{"term": map[string]string{"protocol": "rdp"}},
+				},
+			},
 		})
 	} else {
-		// When no protocol filter, exclude RDP sessions (show SSH only)
+		// Default: show SSH only (exclude RDP)
 		must = append(must, map[string]any{
 			"bool": map[string]any{
 				"must_not": []map[string]any{

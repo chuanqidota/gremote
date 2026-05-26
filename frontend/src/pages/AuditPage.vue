@@ -35,7 +35,7 @@
           </div>
         </div>
         <el-tabs v-model="activeTab" @tab-change="onTabChange">
-          <el-tab-pane label="Linux (SSH)" name="linux">
+          <el-tab-pane v-if="displayMode !== 'windows'" label="Linux (SSH)" name="linux">
             <el-table :data="data" v-loading="loading" border stripe>
               <el-table-column prop="user" label="用户" width="100" />
               <el-table-column prop="source" label="来源 IP" width="140" />
@@ -52,7 +52,7 @@
               </el-table-column>
             </el-table>
           </el-tab-pane>
-          <el-tab-pane label="Windows (RDP)" name="windows">
+          <el-tab-pane v-if="displayMode !== 'linux'" label="Windows (RDP)" name="windows">
             <el-table :data="data" v-loading="loading" border stripe>
               <el-table-column prop="user" label="用户" width="100" />
               <el-table-column prop="source" label="来源 IP" width="140" />
@@ -88,6 +88,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useAudit } from '../composables/useAudit'
+import { getConfig } from '../api'
 
 const { data, count, loading, fetch } = useAudit()
 
@@ -96,11 +97,19 @@ const search = ref('')
 const dateRange = ref<[string, string] | null>(null)
 const page = ref(1)
 const pageSize = ref(10)
+const displayMode = ref('all')
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 function buildQuery() {
-  const protocol = activeTab.value === 'windows' ? 'rdp' : undefined
+  let protocol: string
+  if (displayMode.value === 'all') {
+    protocol = activeTab.value === 'windows' ? 'rdp' : 'ssh'
+  } else if (displayMode.value === 'linux') {
+    protocol = 'ssh'
+  } else {
+    protocol = 'rdp'
+  }
   return {
     offset: (page.value - 1) * pageSize.value,
     limit: pageSize.value,
@@ -136,7 +145,16 @@ function onPlayback(key: string, protocol: string) {
   window.open(`/playback?key=${key}&protocol=${protocol}`, '_blank')
 }
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    const config = await getConfig()
+    displayMode.value = config.display_mode || 'all'
+    if (displayMode.value === 'windows') {
+      activeTab.value = 'windows'
+    }
+  } catch {
+    displayMode.value = 'all'
+  }
   fetchData()
 })
 </script>

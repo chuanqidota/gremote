@@ -10,7 +10,7 @@
     <div class="connect-body">
       <div class="connect-card">
         <el-tabs v-model="activeTab" class="connect-tabs">
-          <el-tab-pane label="Linux (SSH)" name="ssh">
+          <el-tab-pane v-if="displayMode !== 'windows'" label="Linux (SSH)" name="ssh">
             <el-form
               ref="sshFormRef"
               :model="sshForm"
@@ -45,7 +45,7 @@
               </el-form-item>
             </el-form>
           </el-tab-pane>
-          <el-tab-pane label="Windows (RDP)" name="rdp">
+          <el-tab-pane v-if="displayMode !== 'linux'" label="Windows (RDP)" name="rdp">
             <el-form
               ref="rdpFormRef"
               :model="rdpForm"
@@ -90,13 +90,26 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { obtainKey, obtainKeyRDP } from '../api'
+import { obtainKey, obtainKeyRDP, getConfig } from '../api'
 import type { SSHInfo, RDPInfo } from '../types'
 
 const activeTab = ref('ssh')
 const loading = ref(false)
+const displayMode = ref('all')
+
+onMounted(async () => {
+  try {
+    const config = await getConfig()
+    displayMode.value = config.display_mode || 'all'
+    if (displayMode.value === 'windows') {
+      activeTab.value = 'rdp'
+    }
+  } catch {
+    displayMode.value = 'all'
+  }
+})
 
 const sshFormRef = ref<FormInstance>()
 const sshForm = reactive<SSHInfo>({

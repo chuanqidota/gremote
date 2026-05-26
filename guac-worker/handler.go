@@ -36,9 +36,9 @@ func handleConvert(c *gin.Context) {
 	}
 
 	// Init S3 client
-	s3Client, err := minio.New(cfg.S3Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(cfg.S3AccessKey, cfg.S3SecretKey, ""),
-		Secure: cfg.S3UseSSL,
+	s3Client, err := minio.New(cfg.S3.Endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.S3.AccessKey, cfg.S3.SecretKey, ""),
+		Secure: cfg.S3.UseSSL,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ConvertResponse{Error: fmt.Sprintf("failed to init s3 client: %v", err)})
@@ -57,7 +57,7 @@ func handleConvert(c *gin.Context) {
 
 	// Download .guac from S3
 	guacKey := fmt.Sprintf("%s.guac", req.Key)
-	obj, err := s3Client.GetObject(context.Background(), cfg.S3Bucket, guacKey, minio.GetObjectOptions{})
+	obj, err := s3Client.GetObject(context.Background(), cfg.S3.Bucket, guacKey, minio.GetObjectOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ConvertResponse{Error: fmt.Sprintf("failed to get .guac from s3: %v", err)})
 		return
@@ -140,7 +140,7 @@ func handleConvert(c *gin.Context) {
 
 	// Upload MP4 to S3
 	mp4Key := fmt.Sprintf("%s.mp4", req.Key)
-	_, err = s3Client.PutObject(context.Background(), cfg.S3Bucket, mp4Key, bytes.NewReader(mp4Data), int64(len(mp4Data)), minio.PutObjectOptions{})
+	_, err = s3Client.PutObject(context.Background(), cfg.S3.Bucket, mp4Key, bytes.NewReader(mp4Data), int64(len(mp4Data)), minio.PutObjectOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ConvertResponse{Error: fmt.Sprintf("failed to upload mp4 to s3: %v", err)})
 		return
