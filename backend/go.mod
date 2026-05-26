@@ -1,4 +1,4 @@
-module gwebssh
+module gremote
 
 go 1.21.6
 

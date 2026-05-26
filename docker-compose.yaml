@@ -34,7 +34,7 @@ services:
     volumes:
       - ./recordings:/recordings
     environment:
-      S3_ENDPOINT: ${MINIO_ENDPOINT}
+      S3_ENDPOINT: minio:9000
       S3_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       S3_SECRET_KEY: ${MINIO_SECRET_KEY}
       S3_BUCKET: ${MINIO_BUCKET}
@@ -69,7 +69,6 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
-    env_file: .env
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -86,19 +85,17 @@ services:
       - "8000:8000"
     volumes:
       - ./recordings:/opt/recordings
-    env_file: .env
     environment:
-      GWEBSSH_SERVER_PORT: ${SERVER_PORT}
-      GWEBSSH_REDIS_ADDR: ${REDIS_ADDR}
-      GWEBSSH_ELASTICSEARCH_URL: ${ES_URL}
-      GWEBSSH_S3_ENDPOINT: ${MINIO_ENDPOINT}
-      GWEBSSH_S3_ACCESSKEYID: ${MINIO_ACCESS_KEY}
-      GWEBSSH_S3_SECRETACCESSKEY: ${MINIO_SECRET_KEY}
-      GWEBSSH_S3_BUCKET: ${MINIO_BUCKET}
-      GWEBSSH_GUACD_HOST: guacd
-      GWEBSSH_GUACD_RECORDINGPATH: /opt/recordings
-      GWEBSSH_GUACD_GUACDPATH: /recordings
-      GWEBSSH_GUACWORKER_URL: http://guac-worker:8080
+      GREMOTE_REDIS_ADDR: redis:6379
+      GREMOTE_ES_URL: http://elasticsearch:9200
+      GREMOTE_S3_ENDPOINT: minio:9000
+      GREMOTE_S3_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY}
+      GREMOTE_S3_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY}
+      GREMOTE_S3_BUCKET: ${MINIO_BUCKET}
+      GREMOTE_GUACD_HOST: guacd
+      GREMOTE_GUACD_RECORDING_PATH: /opt/recordings
+      GREMOTE_GUACD_GUACD_PATH: /recordings
+      GREMOTE_GUACWORKER_URL: http://guac-worker:8080
     depends_on:
       redis:
         condition: service_healthy

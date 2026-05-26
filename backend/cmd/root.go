@@ -1,16 +1,16 @@
 package cmd
 
 import (
-	"gwebssh/pkg/s3"
+	"gremote/pkg/s3"
 	"os"
 	"os/signal"
 
 	"context"
-	"gwebssh/config"
-	"gwebssh/pkg/es"
-	"gwebssh/pkg/logger"
-	"gwebssh/pkg/redis"
-	"gwebssh/router"
+	"gremote/config"
+	"gremote/pkg/es"
+	"gremote/pkg/logger"
+	"gremote/pkg/redis"
+	"gremote/router"
 
 	"fmt"
 	"net/http"
@@ -21,9 +21,9 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "gwebssh",
-	Short: "go版本的webssh",
-	Long:  "go版本的webssh",
+	Use:   "gremote",
+	Short: "Go Remote Terminal",
+	Long:  "Go Remote Terminal",
 	Run: func(cmd *cobra.Command, args []string) {
 		Run()
 	},

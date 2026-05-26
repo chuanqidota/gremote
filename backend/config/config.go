@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 	"github.com/spf13/viper"
-	"gwebssh/pkg/logger"
+	"gremote/pkg/logger"
 )
 
 type ServerConfig struct {
@@ -82,7 +82,7 @@ func Init() {
 	if err := viper.ReadInConfig(); err != nil {
 		logger.Error(fmt.Sprintf("读取配置文件失败:%s", err.Error()))
 	}
-	viper.SetEnvPrefix("GWEBSSH")
+	viper.SetEnvPrefix("GREMOTE")
 	viper.AutomaticEnv()
 	if err := viper.Unmarshal(&Conf); err != nil {
 		logger.Error(fmt.Sprintf("解析配置文件失败:%s", err.Error()))

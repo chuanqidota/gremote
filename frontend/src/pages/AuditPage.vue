@@ -2,7 +2,7 @@
   <div class="audit-page">
     <div class="top-nav">
       <div class="nav-left">
-        <span class="nav-brand">WebSSH</span>
+        <span class="nav-brand">GRemote</span>
         <span class="nav-tag">控制台</span>
       </div>
       <span class="nav-link" @click="$router.push('/connect')">远程连接 →</span>

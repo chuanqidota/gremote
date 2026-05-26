@@ -1,4 +1,4 @@
-# GWebSSH - Web 终端连接系统
+# GRemote - Web 终端连接系统
 
 基于 Go + Vue 3 的 Web SSH/RDP 终端，支持文件传输、操作审计和会话回放。
 
@@ -47,8 +47,8 @@
 #### 第一步：克隆项目
 
 ```bash
-git clone https://github.com/chuanqidota/gwebssh.git
-cd gwebssh
+git clone https://github.com/chuanqidota/gremote.git
+cd gremote
 ```
 
 #### 第二步：创建环境配置文件
@@ -76,7 +76,7 @@ docker compose ps
 1. 打开 MinIO 控制台：http://localhost:9001
 2. 使用默认账号登录：`minioadmin` / `minioadmin`
 3. 点击 **Access Keys** → **Create Access Key**，记录 AccessKey 和 SecretKey
-4. 点击 **Buckets** → **Create Bucket**，名称填写 `gwebssh`
+4. 点击 **Buckets** → **Create Bucket**，名称填写 `gremote`
 
 #### 第五步：填写 MinIO 凭证到 .env
 
@@ -85,7 +85,7 @@ docker compose ps
 ```bash
 MINIO_ACCESS_KEY=你的AccessKey
 MINIO_SECRET_KEY=你的SecretKey
-MINIO_BUCKET=gwebssh
+MINIO_BUCKET=gremote
 ```
 
 > 如果使用 MinIO 默认的 `minioadmin/minioadmin`，可跳过此步。
@@ -132,8 +132,8 @@ cd backend
 vim config/config.yaml
 
 # 编译运行
-go build -o gwebssh .
-./gwebssh
+go build -o gremote .
+./gremote
 ```
 
 **前端：**
@@ -177,15 +177,15 @@ ElasticSearch:
   Password: ""               # ES 密码
 
 Audit:
-  LoginAuditIndex: gwebssh-login   # 登录审计索引前缀
-  RecordAuditIndex: gwebssh-record # 操作审计索引前缀
+  LoginAuditIndex: gremote-login   # 登录审计索引前缀
+  RecordAuditIndex: gremote-record # 操作审计索引前缀
 
 S3:
   Endpoint: 127.0.0.1:9000   # MinIO 地址
   AccessKeyID: xxx            # MinIO AccessKey
   SecretAccessKey: xxx        # MinIO SecretKey
   UseSSL: false               # 是否使用 HTTPS
-  Bucket: gwebssh             # 桶名
+  Bucket: gremote             # 桶名
 
 Guacd:
   Host: 127.0.0.1            # guacd 地址
@@ -194,30 +194,37 @@ Guacd:
 
 ### Docker 部署
 
-Docker 部署通过 `.env` 文件管理配置，环境变量会覆盖 `config.yaml` 中的值：
+Docker 部署通过环境变量管理配置，环境变量会覆盖 `config.yaml` 中的默认值：
 
 | 环境变量 | 说明 | 默认值 |
 |---------|------|--------|
-| `GWEBSSH_SERVER_PORT` | 服务端口 | 8000 |
-| `GWEBSSH_REDIS_ADDR` | Redis 地址 | redis:6379 |
-| `GWEBSSH_ELASTICSEARCH_URL` | ES 地址 | http://elasticsearch:9200 |
-| `GWEBSSH_S3_ENDPOINT` | MinIO 地址 | minio:9000 |
-| `GWEBSSH_S3_ACCESSKEYID` | MinIO AccessKey | minioadmin |
-| `GWEBSSH_S3_SECRETACCESSKEY` | MinIO SecretKey | minioadmin |
-| `GWEBSSH_S3_BUCKET` | 桶名 | gwebssh |
+| `GREMOTE_SERVER_HOST` | 服务监听地址 | 0.0.0.0 |
+| `GREMOTE_SERVER_PORT` | 服务端口 | 8000 |
+| `GREMOTE_REDIS_ADDR` | Redis 地址 | 127.0.0.1:6379 |
+| `GREMOTE_ES_URL` | ES 地址 | http://127.0.0.1:9200 |
+| `GREMOTE_S3_ENDPOINT` | MinIO 地址 | 127.0.0.1:9000 |
+| `GREMOTE_S3_ACCESS_KEY_ID` | MinIO AccessKey | - |
+| `GREMOTE_S3_SECRET_ACCESS_KEY` | MinIO SecretKey | - |
+| `GREMOTE_S3_BUCKET` | 桶名 | gremote |
+| `GREMOTE_GUACD_HOST` | guacd 地址 | 127.0.0.1 |
+| `GREMOTE_GUACD_PORT` | guacd 端口 | 4822 |
+| `GREMOTE_GUACWORKER_URL` | Worker 服务地址 | http://127.0.0.1:8081 |
 
 > 配置优先级：环境变量 > config.yaml
+>
+> 本地开发时 `config.yaml` 提供默认值，无需设置环境变量即可启动。
+> K8s 部署时通过 ConfigMap/Secret 注入 `GREMOTE_*` 环境变量覆盖默认值。
 
 ---
 
 ## 外部系统接入指南
 
-GWebSSH 提供完整的 REST API，外部系统可通过调用 API 获取会话密钥，再跳转到 Web 终端页面完成 SSH 连接。
+GRemote 提供完整的 REST API，外部系统可通过调用 API 获取会话密钥，再跳转到 Web 终端页面完成 SSH 连接。
 
 ### 接入流程
 
 ```
-外部系统                GWebSSH Backend              GWebSSH Frontend
+外部系统                GRemote Backend              GRemote Frontend
    │                          │                           │
    │  ① POST /obtain-key      │                           │
    │ ────────────────────────>│                           │
@@ -380,7 +387,7 @@ print(f'打开远程桌面: http://your-host/rdp?key={key}&host=192.168.1.100')
 ## 目录结构
 
 ```
-gwebssh/
+gremote/
 ├── backend/                  # Go 后端
 │   ├── cmd/                  # 启动入口
 │   ├── app/

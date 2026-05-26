@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-	"gwebssh/app/api/params"
-	"gwebssh/app/ws/utils/esAudit"
-	"gwebssh/config"
-	"gwebssh/pkg/es"
+	"gremote/app/api/params"
+	"gremote/app/ws/utils/esAudit"
+	"gremote/config"
+	"gremote/pkg/es"
 )
 
 type EsAudit struct {

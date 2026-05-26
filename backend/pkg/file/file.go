@@ -2,9 +2,9 @@ package file
 
 import (
 	"fmt"
-	"gwebssh/app/api/params"
+	"gremote/app/api/params"
 
-	"gwebssh/pkg/logger"
+	"gremote/pkg/logger"
 
 	"io"
 	"mime/multipart"
@@ -13,7 +13,7 @@ import (
 	"bytes"
 
 	"github.com/pkg/sftp"
-	"gwebssh/pkg/terminal"
+	"gremote/pkg/terminal"
 )
 
 type fileHandle struct {

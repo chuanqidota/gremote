@@ -23,7 +23,7 @@ func Init(cfg ...LogConfig) {
 		logConf = cfg[0]
 	} else {
 		logConf = LogConfig{
-			Filename:   "./log/gwebssh.log",
+			Filename:   "./log/gremote.log",
 			MaxSize:    10,
 			MaxBackups: 5,
 			MaxAge:     7,

@@ -4,20 +4,20 @@ import (
 	"bytes"
 	"fmt"
 	"time"
-	"gwebssh/app/api/params"
-	"gwebssh/app/ws/utils/recordAudit"
-	"gwebssh/config"
-	"gwebssh/pkg/s3"
-	"gwebssh/pkg/response"
+	"gremote/app/api/params"
+	"gremote/app/ws/utils/recordAudit"
+	"gremote/config"
+	"gremote/pkg/s3"
+	"gremote/pkg/response"
 
 	"strings"
-	"gwebssh/pkg/redis"
+	"gremote/pkg/redis"
 
-	"gwebssh/pkg/file"
+	"gremote/pkg/file"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"gwebssh/app/ws/utils/loginAudit"
+	"gremote/app/ws/utils/loginAudit"
 )
 
 type apiHandle struct {

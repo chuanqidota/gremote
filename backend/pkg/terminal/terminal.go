@@ -9,9 +9,9 @@ import (
 	"io"
 	"sync"
 	"time"
-	"gwebssh/app/ws/utils/recordAudit"
-	"gwebssh/pkg/asciinema"
-	"gwebssh/pkg/logger"
+	"gremote/app/ws/utils/recordAudit"
+	"gremote/pkg/asciinema"
+	"gremote/pkg/logger"
 )
 
 // Client ssh客户端

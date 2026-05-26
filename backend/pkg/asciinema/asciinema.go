@@ -3,7 +3,7 @@ package asciinema
 import (
 	"encoding/json"
 	"time"
-	"gwebssh/app/ws/utils/recordAudit"
+	"gremote/app/ws/utils/recordAudit"
 )
 
 // asciinema 文档https://docs.asciinema.org/manual/asciicast/v2/

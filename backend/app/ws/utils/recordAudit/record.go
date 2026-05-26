@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-	"gwebssh/app/ws/utils/esAudit"
-	"gwebssh/config"
-	"gwebssh/pkg/es"
+	"gremote/app/ws/utils/esAudit"
+	"gremote/config"
+	"gremote/pkg/es"
 )
 
 type EsRecord struct {

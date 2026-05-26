@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-	"gwebssh/config"
-	"gwebssh/pkg/logger"
+	"gremote/config"
+	"gremote/pkg/logger"
 
 	"github.com/redis/go-redis/v9"
 )

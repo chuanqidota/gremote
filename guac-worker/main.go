@@ -9,17 +9,17 @@ import (
 
 type Config struct {
 	S3Endpoint  string
-	S3AccessKey  string
-	S3SecretKey  string
-	S3Bucket     string
-	S3UseSSL     bool
+	S3AccessKey string
+	S3SecretKey string
+	S3Bucket    string
+	S3UseSSL    bool
 }
 
 var cfg Config
 
 func main() {
 	cfg = Config{
-		S3Endpoint: getEnv("S3_ENDPOINT", "minio:9000"),
+		S3Endpoint:  getEnv("S3_ENDPOINT", "minio:9000"),
 		S3AccessKey: getEnv("S3_ACCESS_KEY", ""),
 		S3SecretKey: getEnv("S3_SECRET_KEY", ""),
 		S3Bucket:    getEnv("S3_BUCKET", "gwebssh"),

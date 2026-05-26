@@ -11,16 +11,16 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN go build -o gwebssh main.go
+RUN go build -o gremote main.go
 
 FROM alpine:3
 
 RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /opt
-COPY --from=builder /opt/gwebssh /opt/gwebssh
+COPY --from=builder /opt/gremote /opt/gremote
 COPY --from=builder /opt/config /opt/config
 
 EXPOSE 8000
 
-ENTRYPOINT ["./gwebssh"]
+ENTRYPOINT ["./gremote"]

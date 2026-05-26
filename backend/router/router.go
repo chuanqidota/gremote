@@ -1,9 +1,9 @@
 package router
 
 import (
-	apiview "gwebssh/app/api/view"
-	wsview "gwebssh/app/ws/view"
-	"gwebssh/pkg/middleware"
+	apiview "gremote/app/api/view"
+	wsview "gremote/app/ws/view"
+	"gremote/pkg/middleware"
 
 	"github.com/gin-gonic/gin"
 )

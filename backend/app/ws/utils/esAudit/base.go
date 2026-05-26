@@ -2,8 +2,8 @@ package esAudit
 
 import (
 	"fmt"
-	"gwebssh/pkg/es"
-	"gwebssh/pkg/logger"
+	"gremote/pkg/es"
+	"gremote/pkg/logger"
 )
 
 type Base struct {

@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"gwebssh/config"
-	"gwebssh/pkg/logger"
-	"gwebssh/pkg/response"
-	"gwebssh/pkg/s3"
+	"gremote/config"
+	"gremote/pkg/logger"
+	"gremote/pkg/response"
+	"gremote/pkg/s3"
 
 	"github.com/gin-gonic/gin"
 )
