@@ -1,5 +1,4 @@
 import { ref, nextTick, onUnmounted } from 'vue'
-import type { Ref } from 'vue'
 
 export function useGuacPlayback() {
   const loading = ref(true)
@@ -12,11 +11,15 @@ export function useGuacPlayback() {
   const duration = ref(0)
   const seeking = ref(false)
   const seekProgress = ref(0)
+  const playbackSpeed = ref(1)
+  const ended = ref(false)
 
   let recording: any = null
   let containerEl: HTMLDivElement | null = null
   let blobSize = 0
   let loaded = false
+  let speedTimer: ReturnType<typeof setInterval> | null = null
+  const SPEED_TICK_MS = 200
 
   function fitDisplay() {
     if (!recording || !containerEl) return
@@ -64,17 +67,14 @@ export function useGuacPlayback() {
 
     loadingLabel.value = '正在解析录制数据...'
 
-    console.log('[GuacPlayback] Creating SessionRecording, blob size:', blobSize)
     const rec = new Guacamole.SessionRecording(blob)
 
     rec.onerror = (msg: string) => {
-      console.error('[GuacPlayback] onerror:', msg)
       error.value = `回放错误: ${msg}`
       loading.value = false
     }
 
     rec.onprogress = (dur: number, parsedSize: number) => {
-      console.log('[GuacPlayback] onprogress: dur=', dur, 'parsed=', parsedSize, 'blobSize=', blobSize)
       if (blobSize > 0) {
         loadingProgress.value = Math.min(parsedSize / blobSize, 1)
       }
@@ -82,7 +82,6 @@ export function useGuacPlayback() {
     }
 
     rec.onload = () => {
-      console.log('[GuacPlayback] onload: duration=', rec.getDuration())
       duration.value = rec.getDuration() / 1000
       if (duration.value === 0) {
         error.value = '录制文件格式无效，未找到有效的录制帧'
@@ -99,22 +98,24 @@ export function useGuacPlayback() {
         const displayEl = display.getElement()
         displayEl.style.cursor = 'none'
         const target = containerEl || getContainer()
-        console.log('[GuacPlayback] target:', target, 'displayW:', display.getWidth(), 'displayH:', display.getHeight())
         if (target) {
           target.appendChild(displayEl)
           containerEl = target
-          console.log('[GuacPlayback] appended, containerW:', target.clientWidth, 'containerH:', target.clientHeight)
-        } else {
-          console.warn('[GuacPlayback] containerEl is null, display not appended')
         }
 
-        display.onresize = (w, h) => { console.log('[GuacPlayback] onresize:', w, h); fitDisplay() }
+        display.onresize = () => fitDisplay()
         fitDisplay()
       })
     }
 
-    rec.onplay = () => { paused.value = false }
-    rec.onpause = () => { paused.value = true }
+    rec.onplay = () => { paused.value = false; ended.value = false }
+    rec.onpause = () => {
+      paused.value = true
+      stopSpeedPlayback()
+      if (rec.getPosition() >= rec.getDuration() && rec.getDuration() > 0) {
+        ended.value = true
+      }
+    }
     rec.onseek = (position: number, current: number, total: number) => {
       currentTime.value = position / 1000
       progress.value = duration.value > 0 ? (position / 1000 / duration.value) * 100 : 0
@@ -130,29 +131,96 @@ export function useGuacPlayback() {
   }
 
   function play() {
-    recording?.play()
+    if (!recording) return
+    if (playbackSpeed.value === 1) {
+      recording.play()
+    } else {
+      startSpeedPlayback()
+    }
   }
 
   function pause() {
+    stopSpeedPlayback()
     recording?.pause()
   }
 
   function togglePlay() {
     if (!recording) return
-    if (recording.isPlaying()) {
-      recording.pause()
+    if (recording.isPlaying() || speedTimer) {
+      pause()
     } else {
-      recording.play()
+      if (ended.value) {
+        ended.value = false
+        recording.seek(0, () => { play() })
+      } else {
+        play()
+      }
     }
   }
 
   function seek(percentage: number) {
     if (!recording || duration.value <= 0) return
+    const wasPlaying = recording.isPlaying() || !!speedTimer
+    stopSpeedPlayback()
     const positionMs = (percentage / 100) * duration.value * 1000
-    recording.seek(positionMs)
+    recording.seek(positionMs, () => {
+      if (wasPlaying) play()
+    })
+  }
+
+  function setSpeed(speed: number) {
+    playbackSpeed.value = speed
+    // If currently playing with custom loop, restart with new speed
+    if (speedTimer) {
+      stopSpeedPlayback()
+      startSpeedPlayback()
+    } else if (recording?.isPlaying() && speed !== 1) {
+      // Switching from native 1x to custom speed
+      recording.pause()
+      startSpeedPlayback()
+    }
+  }
+
+  function startSpeedPlayback() {
+    if (!recording || speedTimer) return
+    ended.value = false
+    const speed = playbackSpeed.value
+    const tickMs = SPEED_TICK_MS
+    const positionIncrement = speed * tickMs // ms to advance per tick
+
+    speedTimer = setInterval(() => {
+      if (!recording) { stopSpeedPlayback(); return }
+      const pos = recording.getPosition()
+      const dur = recording.getDuration()
+      const nextPos = pos + positionIncrement
+
+      if (nextPos >= dur) {
+        // Seek to end and stop
+        recording.seek(dur, () => {
+          ended.value = true
+          paused.value = true
+          if (recording) recording.onpause?.()
+        })
+        stopSpeedPlayback()
+        return
+      }
+
+      recording.seek(nextPos)
+    }, tickMs)
+
+    paused.value = false
+    recording.onplay?.()
+  }
+
+  function stopSpeedPlayback() {
+    if (speedTimer) {
+      clearInterval(speedTimer)
+      speedTimer = null
+    }
   }
 
   function destroy() {
+    stopSpeedPlayback()
     if (recording) {
       recording.abort()
       const displayEl = recording.getDisplay()?.getElement()
@@ -178,11 +246,14 @@ export function useGuacPlayback() {
     duration,
     seeking,
     seekProgress,
+    playbackSpeed,
+    ended,
     load,
     play,
     pause,
     togglePlay,
     seek,
+    setSpeed,
     fitDisplay,
     setContainer,
     destroy,
