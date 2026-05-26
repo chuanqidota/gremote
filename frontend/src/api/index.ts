@@ -44,3 +44,16 @@ export async function getRecordUrl(key: string): Promise<string> {
 export function getRecordFileGuacUrl(key: string): string {
   return `/api/v1/record-file-guac?key=${encodeURIComponent(key)}`
 }
+
+export function getRecordFileMP4Url(key: string): string {
+  return `/api/v1/record-file-mp4?key=${encodeURIComponent(key)}`
+}
+
+export async function getConvertStatus(key: string): Promise<{ converted: boolean; converting?: boolean; mp4_url?: string }> {
+  const { data } = await http.get('/convert-status', { params: { key } })
+  return data.data
+}
+
+export async function triggerConvert(key: string): Promise<void> {
+  await http.post('/convert-guac', null, { params: { key } })
+}

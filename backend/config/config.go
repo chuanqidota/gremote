@@ -10,6 +10,9 @@ type ServerConfig struct {
 	Host               string `yaml:"Host" comment:"服务监听地址"`
 	Port               int    `yaml:"Port" comment:"服务端口"`
 	SessionTTL         int    `yaml:"SessionTTL" comment:"会话密钥过期时间（秒）"`
+	ReadTimeout        int    `yaml:"ReadTimeout" comment:"HTTP读取超时（秒）"`
+	WriteTimeout       int    `yaml:"WriteTimeout" comment:"HTTP写入超时（秒）"`
+	ShutdownTimeout    int    `yaml:"ShutdownTimeout" comment:"优雅关闭超时（秒）"`
 	InsecureSkipVerify bool   `yaml:"InsecureSkipVerify" comment:"跳过SSH主机密钥验证"`
 }
 
@@ -39,18 +42,37 @@ type S3Config struct {
 }
 
 type GuacdConfig struct {
-	Host          string `yaml:"Host" comment:"guacd主机地址"`
-	Port          int    `yaml:"Port" comment:"guacd端口"`
-	RecordingPath string `yaml:"RecordingPath" comment:"guacd录制文件路径"`
+	Host           string `yaml:"Host" comment:"guacd主机地址"`
+	Port           int    `yaml:"Port" comment:"guacd端口"`
+	RecordingPath  string `yaml:"RecordingPath" comment:"后端读取录制文件路径"`
+	GuacdPath      string `yaml:"GuacdPath" comment:"guacd容器内录制文件路径"`
+	DefaultWidth   int    `yaml:"DefaultWidth" comment:"RDP默认宽度"`
+	DefaultHeight  int    `yaml:"DefaultHeight" comment:"RDP默认高度"`
+	DefaultDPI     int    `yaml:"DefaultDPI" comment:"RDP默认DPI"`
+	SessionTimeout int    `yaml:"SessionTimeout" comment:"RDP会话超时（秒）"`
+}
+
+type GuacWorkerConfig struct {
+	URL     string `yaml:"URL" comment:"Worker服务地址"`
+	Timeout int    `yaml:"Timeout" comment:"转换超时（秒）"`
+}
+
+type LoggerConfig struct {
+	Filename   string `yaml:"Filename" comment:"日志文件路径"`
+	MaxSize    int    `yaml:"MaxSize" comment:"日志文件最大大小（MB）"`
+	MaxBackups int    `yaml:"MaxBackups" comment:"最大保留旧日志数量"`
+	MaxAge     int    `yaml:"MaxAge" comment:"旧日志最长保留天数"`
 }
 
 type Config struct {
-	Server        ServerConfig `yaml:"Server"`
-	Redis         RedisConfig  `yaml:"Redis"`
-	ElasticSearch ESConfig     `yaml:"ElasticSearch"`
-	Audit         AuditConfig  `yaml:"Audit"`
-	S3            S3Config     `yaml:"S3"`
-	Guacd         GuacdConfig  `yaml:"Guacd"`
+	Server        ServerConfig     `yaml:"Server"`
+	Redis         RedisConfig      `yaml:"Redis"`
+	ElasticSearch ESConfig         `yaml:"ElasticSearch"`
+	Audit         AuditConfig      `yaml:"Audit"`
+	S3            S3Config         `yaml:"S3"`
+	Guacd         GuacdConfig      `yaml:"Guacd"`
+	GuacWorker    GuacWorkerConfig `yaml:"GuacWorker"`
+	Logger        LoggerConfig     `yaml:"Logger"`
 }
 
 var Conf = new(Config)

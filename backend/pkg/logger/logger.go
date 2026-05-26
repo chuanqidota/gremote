@@ -10,15 +10,32 @@ import (
 
 var logger = logrus.New()
 
-func Init() {
-	// 创建一个 lumberjack.Logger 实例，用于日志切割
+type LogConfig struct {
+	Filename   string
+	MaxSize    int
+	MaxBackups int
+	MaxAge     int
+}
+
+func Init(cfg ...LogConfig) {
+	var logConf LogConfig
+	if len(cfg) > 0 {
+		logConf = cfg[0]
+	} else {
+		logConf = LogConfig{
+			Filename:   "./log/gwebssh.log",
+			MaxSize:    10,
+			MaxBackups: 5,
+			MaxAge:     7,
+		}
+	}
 	logFile := &lumberjack.Logger{
-		Filename:   "./log/gwebssh.log", // 日志文件名
-		MaxSize:    10,                 // 每个日志文件最大大小，单位为 MB
-		MaxBackups: 5,                  // 最多保留的旧日志文件数量
-		MaxAge:     7,                  // 最长保留的旧日志文件天数
-		LocalTime:  true,               // 以本地时间为基准
-		Compress:   false,              // 是否压缩旧日志文件
+		Filename:   logConf.Filename,
+		MaxSize:    logConf.MaxSize,
+		MaxBackups: logConf.MaxBackups,
+		MaxAge:     logConf.MaxAge,
+		LocalTime:  true,
+		Compress:   false,
 	}
 
 	// 创建一个 logrus.Logger 实例，用于日志记录和输出

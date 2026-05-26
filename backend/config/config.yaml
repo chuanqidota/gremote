@@ -2,6 +2,9 @@ Server:
   Host: 0.0.0.0
   Port: 8000
   SessionTTL: 86400
+  ReadTimeout: 60
+  WriteTimeout: 60
+  ShutdownTimeout: 5
   InsecureSkipVerify: true
 Redis:
   Addr: 127.0.0.1:6379
@@ -24,4 +27,19 @@ S3:
 Guacd:
   Host: 127.0.0.1
   Port: 4822
-  RecordingPath: ./recordings
+  RecordingPath: ../recordings
+  GuacdPath: /recordings
+  DefaultWidth: 1024
+  DefaultHeight: 768
+  DefaultDPI: 96
+  SessionTimeout: 86400
+
+GuacWorker:
+  URL: http://127.0.0.1:8081
+  Timeout: 300
+
+Logger:
+  Filename: ./log/gwebssh.log
+  MaxSize: 10
+  MaxBackups: 5
+  MaxAge: 7

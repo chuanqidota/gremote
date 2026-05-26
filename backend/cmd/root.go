@@ -38,7 +38,12 @@ func Execute() {
 
 func init() {
 	config.Init()
-	logger.Init()
+	logger.Init(logger.LogConfig{
+		Filename:   config.Conf.Logger.Filename,
+		MaxSize:    config.Conf.Logger.MaxSize,
+		MaxBackups: config.Conf.Logger.MaxBackups,
+		MaxAge:     config.Conf.Logger.MaxAge,
+	})
 	redis.Init()
 	es.Init()
 	s3.Init()
@@ -49,8 +54,8 @@ func Run() {
 	server := &http.Server{
 		Addr:           addr,
 		Handler:        router.Engine(),
-		ReadTimeout:    60 * time.Second,
-		WriteTimeout:   60 * time.Second,
+		ReadTimeout:    time.Duration(config.Conf.Server.ReadTimeout) * time.Second,
+		WriteTimeout:   time.Duration(config.Conf.Server.WriteTimeout) * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
 	go func() {
@@ -58,8 +63,7 @@ func Run() {
 		signal.Notify(c, os.Interrupt)
 		<-c
 
-		// 创建一个5秒的上下文，以便优雅关闭
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Conf.Server.ShutdownTimeout)*time.Second)
 		defer cancel()
 
 		if err := server.Shutdown(ctx); err != nil {

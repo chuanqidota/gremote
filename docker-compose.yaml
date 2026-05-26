@@ -24,6 +24,27 @@ services:
       timeout: 5s
       retries: 3
 
+  guac-worker:
+    build:
+      context: ./guac-worker
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./recordings:/recordings
+    environment:
+      S3_ENDPOINT: ${MINIO_ENDPOINT}
+      S3_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      S3_SECRET_KEY: ${MINIO_SECRET_KEY}
+      S3_BUCKET: ${MINIO_BUCKET}
+      S3_USE_SSL: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   elasticsearch:
     image: docker.1ms.run/library/elasticsearch:8.17.10
     restart: always
@@ -64,7 +85,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./recordings:/recordings
+      - ./recordings:/opt/recordings
     env_file: .env
     environment:
       GWEBSSH_SERVER_PORT: ${SERVER_PORT}
@@ -74,6 +95,10 @@ services:
       GWEBSSH_S3_ACCESSKEYID: ${MINIO_ACCESS_KEY}
       GWEBSSH_S3_SECRETACCESSKEY: ${MINIO_SECRET_KEY}
       GWEBSSH_S3_BUCKET: ${MINIO_BUCKET}
+      GWEBSSH_GUACD_HOST: guacd
+      GWEBSSH_GUACD_RECORDINGPATH: /opt/recordings
+      GWEBSSH_GUACD_GUACDPATH: /recordings
+      GWEBSSH_GUACWORKER_URL: http://guac-worker:8080
     depends_on:
       redis:
         condition: service_healthy
@@ -82,6 +107,8 @@ services:
       minio:
         condition: service_started
       guacd:
+        condition: service_healthy
+      guac-worker:
         condition: service_healthy
 
   frontend:

@@ -29,6 +29,19 @@ func Init() {
 	}
 	S3Client = client
 	logger.Info("初始化S3客户端成功")
+
+	// Auto-create bucket if not exists
+	bucketName := config.Conf.S3.Bucket
+	exists, err := client.BucketExists(context.Background(), bucketName)
+	if err != nil {
+		logger.Error(fmt.Sprintf("检查S3 bucket失败-%s", err.Error()))
+	} else if !exists {
+		if err := client.MakeBucket(context.Background(), bucketName, minio.MakeBucketOptions{}); err != nil {
+			logger.Error(fmt.Sprintf("创建S3 bucket失败-%s", err.Error()))
+		} else {
+			logger.Info(fmt.Sprintf("创建S3 bucket成功: %s", bucketName))
+		}
+	}
 }
 
 // UploadFile 上传数据到S3中，文件名key

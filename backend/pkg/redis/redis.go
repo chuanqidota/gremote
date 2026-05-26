@@ -65,7 +65,7 @@ func DeleteKey(key string) {
 // IsConnected 判断有没有连接过
 func IsConnected(key string) bool {
 	isConnectedKey := key + "_connected"
-	ok, err := RedisClient.SetNX(context.Background(), isConnectedKey, true, 24*60*60*time.Second).Result()
+	ok, err := RedisClient.SetNX(context.Background(), isConnectedKey, true, time.Duration(config.Conf.Server.SessionTTL)*time.Second).Result()
 	if err != nil {
 		logger.Error(fmt.Sprintf("SetNX失败-%s", err.Error()))
 		return true

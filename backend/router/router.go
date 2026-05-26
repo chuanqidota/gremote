@@ -23,6 +23,9 @@ func Engine() *gin.Engine {
 		api.GET("record-file", apiview.ApiHandle.RecordFile)
 		api.GET("record-file-guac", apiview.ApiHandle.RecordFileGuac)
 		api.GET("list-guac-files", apiview.ApiHandle.ListGuacFiles)
+		api.POST("convert-guac", apiview.ApiHandle.ConvertGuac)
+		api.GET("convert-status", apiview.ApiHandle.ConvertStatus)
+		api.GET("record-file-mp4", apiview.ApiHandle.RecordFileMP4)
 	}
 
 	ws := router.Group("ws/v1").Use(middleware.CORSMiddleware())

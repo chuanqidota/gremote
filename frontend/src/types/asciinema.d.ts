@@ -2,7 +2,7 @@ declare module 'element-plus/dist/locale/zh-cn.mjs'
 
 declare module 'asciinema-player' {
   export function create(
-    src: string,
+    src: string | { driver?: string; data?: string | Blob; url?: string },
     element: HTMLElement,
     opts?: {
       autoPlay?: boolean

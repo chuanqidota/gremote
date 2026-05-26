@@ -87,17 +87,18 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 		_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("连接guacd失败: %s", err.Error())))
 		return
 	}
-	defer guacClient.Close()
 	logger.Info("RDP connected to guacd successfully")
+	// NOTE: guacClient.Close() is called explicitly before reading the
+	// recording file to ensure guacd flushes the recording to disk.
 
 	// 6. Read viewport size from query params (sent by browser)
 	width := c.Query("width")
 	height := c.Query("height")
 	if width == "" {
-		width = "1024"
+		width = fmt.Sprintf("%d", config.Conf.Guacd.DefaultWidth)
 	}
 	if height == "" {
-		height = "768"
+		height = fmt.Sprintf("%d", config.Conf.Guacd.DefaultHeight)
 	}
 	logger.Info(fmt.Sprintf("RDP viewport size: %sx%s", width, height))
 
@@ -109,13 +110,13 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 		"password":              info.Password,
 		"width":                 width,
 		"height":                height,
-		"dpi":                   "96",
+		"dpi":                   fmt.Sprintf("%d", config.Conf.Guacd.DefaultDPI),
 		"security":              "any",
 		"ignore-cert":           "true",
 		"disable-audio":         "true",
 		"enable-wallpaper":      "false",
 		"enable-theming":        "false",
-		"recording-path":        fmt.Sprintf("/recordings/%s.guac", key),
+		"recording-path":        fmt.Sprintf("%s/%s.guac", config.Conf.Guacd.GuacdPath, key),
 		"create-recording-path": "true",
 	}
 	if info.Domain != "" {
@@ -218,22 +219,24 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 
 	select {
 	case <-sessionDone:
-	case <-time.After(24 * time.Hour):
+	case <-time.After(time.Duration(config.Conf.Guacd.SessionTimeout) * time.Second):
 		logger.Error("RDP session timed out")
 	}
 
 	// 9. Upload guacd recording to MinIO
-	// Wait for guacd to finish writing the recording file
+	// Close guacd connection first to ensure it flushes the recording to disk
+	logger.Info("RDP closing guacd connection to flush recording")
+	guacClient.Close()
+
 	// guacd creates a directory <key>.guac/ with a "recording" file inside
 	recordBasePath := config.Conf.Guacd.RecordingPath
-	if recordBasePath == "" {
-		recordBasePath = "/recordings"
-	}
 	recordingPath := fmt.Sprintf("%s/%s.guac/recording", recordBasePath, key)
 	recordingKey := fmt.Sprintf("%s.guac", key)
+	logger.Info(fmt.Sprintf("RDP looking for recording at: %s", recordingPath))
+
 	var data []byte
-	for i := 0; i < 10; i++ {
-		time.Sleep(500 * time.Millisecond)
+	for i := 0; i < 30; i++ {
+		time.Sleep(1 * time.Second)
 		var err error
 		data, err = os.ReadFile(recordingPath)
 		if err == nil && len(data) > 0 {
@@ -241,28 +244,36 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 			break
 		}
 		if err != nil {
-			logger.Error(fmt.Sprintf("RDP recording file read attempt %d failed: %s", i+1, err.Error()))
+			logger.Info(fmt.Sprintf("RDP recording file read attempt %d/30 failed: %s", i+1, err.Error()))
 		} else {
-			logger.Error(fmt.Sprintf("RDP recording file is empty on attempt %d", i+1))
+			logger.Info(fmt.Sprintf("RDP recording file is empty on attempt %d/30", i+1))
 		}
 	}
 
 	if len(data) > 0 {
+		uploaded := false
 		for i := 0; i < 10; i++ {
 			if err := s3.UploadFile(recordingKey, data); err != nil {
-				logger.Error(fmt.Sprintf("RDP recording upload failed: %s", err.Error()))
-				time.Sleep(100 * time.Millisecond)
+				logger.Error(fmt.Sprintf("RDP recording S3 upload attempt %d failed: %s", i+1, err.Error()))
+				time.Sleep(500 * time.Millisecond)
 				continue
 			}
-			logger.Info(fmt.Sprintf("RDP recording uploaded: %s (%d bytes)", recordingKey, len(data)))
+			logger.Info(fmt.Sprintf("RDP recording uploaded to S3: %s (%d bytes)", recordingKey, len(data)))
+			uploaded = true
 			break
 		}
-		// Clean up local recording file
-		if err := os.Remove(recordingPath); err != nil {
+		if !uploaded {
+			logger.Error(fmt.Sprintf("RDP recording S3 upload failed after 10 retries: %s", recordingKey))
+		}
+		// Clean up local recording directory
+		dirPath := fmt.Sprintf("%s/%s.guac", recordBasePath, key)
+		if err := os.RemoveAll(dirPath); err != nil {
 			logger.Error(fmt.Sprintf("RDP recording cleanup failed: %s", err.Error()))
+		} else {
+			logger.Info(fmt.Sprintf("RDP recording cleanup success: %s", dirPath))
 		}
 	} else {
-		logger.Error(fmt.Sprintf("RDP recording file not found after retries: %s", recordingPath))
+		logger.Error(fmt.Sprintf("RDP recording file not found after 30 retries (30s): %s", recordingPath))
 	}
 
 	logger.Info(fmt.Sprintf("RDP session ended for key: %s", key))

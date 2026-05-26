@@ -1,10 +1,114 @@
 declare module 'guacamole-common-js' {
   export class Display {
+    constructor()
+    cursorHotspotX: number
+    cursorHotspotY: number
+    cursorX: number
+    cursorY: number
     getElement(): HTMLDivElement
-    eval(opcode: string, args: string[]): void
     getDisplayElement(): HTMLDivElement
+    getDefaultLayer(): VisibleLayer
+    getCursorLayer(): VisibleLayer
+    createLayer(): VisibleLayer
+    createBuffer(): Layer
+    getWidth(): number
+    getHeight(): number
+    resize(layer: any, width: number, height: number): void
+    draw(layer: any, x: number, y: number, url: string): void
+    drawBlob(layer: any, x: number, y: number, blob: Blob): void
+    drawImage(layer: any, x: number, y: number, image: CanvasImageSource): void
+    drawStream(layer: any, x: number, y: number, stream: any, mimetype: string): void
+    rect(layer: any, x: number, y: number, w: number, h: number): void
+    clip(layer: any): void
+    setChannelMask(layer: any, mask: number): void
+    fillColor(layer: any, r: number, g: number, b: number, a: number): void
+    strokeColor(layer: any, cap: string, join: string, thickness: number, r: number, g: number, b: number, a: number): void
+    setCursor(hotspotX: number, hotspotY: number, srcLayer: any, srcx: number, srcy: number, srcw: number, srch: number): void
     showCursor(shown: boolean): void
-    setCursor(hotspotX: number, hotspotY: number, layer: any, srcx: number, srcy: number, srcw: number, srch: number): void
+    moveCursor(x: number, y: number): void
+    moveTo(layer: any, x: number, y: number): void
+    lineTo(layer: any, x: number, y: number): void
+    close(layer: any): void
+    push(layer: any): void
+    pop(layer: any): void
+    reset(layer: any): void
+    setTransform(layer: any, a: number, b: number, c: number, d: number, e: number, f: number): void
+    transform(layer: any, a: number, b: number, c: number, d: number, e: number, f: number): void
+    copy(srcLayer: any, srcx: number, srcy: number, srcw: number, srch: number, dstLayer: any, x: number, y: number): void
+    put(srcLayer: any, srcx: number, srcy: number, srcw: number, srch: number, dstLayer: any, x: number, y: number): void
+    move(layer: any, parent: any, x: number, y: number, z: number): void
+    dispose(layer: any): void
+    shade(layer: any, alpha: number): void
+    distort(layer: any, a: number, b: number, c: number, d: number, e: number, f: number): void
+    scale(scale: number): void
+    flush(callback?: () => void, timestamp?: number, logicalFrames?: number): void
+    cancel(): void
+    flatten(): HTMLCanvasElement
+  }
+
+  export class VisibleLayer {
+    width: number
+    height: number
+    x: number
+    y: number
+    z: number
+    alpha: number
+    getElement(): HTMLDivElement
+    getCanvas(): HTMLCanvasElement
+    toCanvas(): HTMLCanvasElement
+    resize(width: number, height: number): void
+    drawImage(x: number, y: number, image: CanvasImageSource): void
+    moveTo(x: number, y: number): void
+    lineTo(x: number, y: number): void
+    close(): void
+    rect(x: number, y: number, w: number, h: number): void
+    clip(): void
+    push(): void
+    pop(): void
+    reset(): void
+    fillColor(r: number, g: number, b: number, a: number): void
+    strokeColor(cap: string, join: string, thickness: number, r: number, g: number, b: number, a: number): void
+    setChannelMask(mask: number): void
+    setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void
+    transform(a: number, b: number, c: number, d: number, e: number, f: number): void
+    translate(x: number, y: number): void
+    move(parent: VisibleLayer | Layer, x: number, y: number, z: number): void
+    dispose(): void
+    shade(alpha: number): void
+    distort(a: number, b: number, c: number, d: number, e: number, f: number): void
+    copy(srcLayer: any, srcx: number, srcy: number, srcw: number, srch: number, x: number, y: number): void
+    put(srcLayer: any, srcx: number, srcy: number, srcw: number, srch: number, x: number, y: number): void
+    transfer(srcLayer: any, srcx: number, srcy: number, srcw: number, srch: number, x: number, y: number, transferFunction: any): void
+    fillLayer(srcLayer: any): void
+    strokeLayer(cap: string, join: string, thickness: number, srcLayer: any): void
+  }
+
+  export class Layer {
+    width: number
+    height: number
+    autosize: boolean
+    getCanvas(): HTMLCanvasElement
+    toCanvas(): HTMLCanvasElement
+    resize(width: number, height: number): void
+    drawImage(x: number, y: number, image: CanvasImageSource): void
+    moveTo(x: number, y: number): void
+    lineTo(x: number, y: number): void
+    close(): void
+    rect(x: number, y: number, w: number, h: number): void
+    clip(): void
+    push(): void
+    pop(): void
+    reset(): void
+    fillColor(r: number, g: number, b: number, a: number): void
+    strokeColor(cap: string, join: string, thickness: number, r: number, g: number, b: number, a: number): void
+    setChannelMask(mask: number): void
+    setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void
+    transform(a: number, b: number, c: number, d: number, e: number, f: number): void
+    copy(srcLayer: any, srcx: number, srcy: number, srcw: number, srch: number, x: number, y: number): void
+    put(srcLayer: any, srcx: number, srcy: number, srcw: number, srch: number, x: number, y: number): void
+    transfer(srcLayer: any, srcx: number, srcy: number, srcw: number, srch: number, x: number, y: number, transferFunction: any): void
+    fillLayer(srcLayer: any): void
+    strokeLayer(cap: string, join: string, thickness: number, srcLayer: any): void
   }
 
   export class Client {
@@ -25,6 +129,10 @@ declare module 'guacamole-common-js' {
       CONNECTING: number
       OPEN: number
     }
+    oninstruction: ((opcode: string, args: string[]) => void) | null
+    connect(data?: string): void
+    disconnect(): void
+    sendMessage(...elements: any[]): void
   }
 
   export class WebSocketTunnel {
@@ -53,26 +161,26 @@ declare module 'guacamole-common-js' {
     play(): void
     pause(): void
     seek(position: number): void
+    seek(position: number, callback: () => void): void
+    isPlaying(): boolean
+    cancel(): void
     getState(): number
     getDuration(): number
     getPosition(): number
+    getDisplay(): Display
     oninstruction: ((opcode: string, args: string[]) => void) | null
-    onstatechange: ((state: number) => void) | null
-    onprogress: ((position: number) => void) | null
+    onprogress: ((duration: number, bytes: number) => void) | null
     ondurationchange: ((duration: number) => void) | null
     onplay: (() => void) | null
     onpause: (() => void) | null
     onseek: ((position: number) => void) | null
     onerror: ((errorMsg: any) => void) | null
-    static State: {
-      CLOSED: number
-      CONNECTING: number
-      OPEN: number
-    }
-    static seekMode: {
-      RELATIVE: number
-      ABSOLUTE: number
-    }
+    onload: (() => void) | null
+  }
+
+  export class Parser {
+    oninstruction: ((opcode: string, args: string[]) => void) | null
+    receive(packet: string): void
   }
 
   export class Mouse {
