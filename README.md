@@ -174,59 +174,69 @@ npm run build
 
 ```yaml
 Server:
-  Host: 0.0.0.0              # 服务监听地址
-  Port: 8000                 # 服务端口
-  SessionTTL: 86400          # 会话密钥过期时间（秒），默认24小时
-  InsecureSkipVerify: true   # 跳过SSH主机密钥验证
+  Host: 0.0.0.0                # 服务监听地址
+  Port: 8000                   # 服务端口
+  SessionTTL: 86400            # 会话密钥过期时间（秒），默认24小时
+  ReadTimeout: 60              # HTTP 读超时（秒）
+  WriteTimeout: 60             # HTTP 写超时（秒）
+  ShutdownTimeout: 5           # 优雅关闭超时（秒）
+  InsecureSkipVerify: true     # 跳过 SSH 主机密钥验证
 
 Redis:
-  Addr: 127.0.0.1:6379       # Redis 地址
-  Password: ""               # Redis 密码
-  DB: 0                      # Redis 数据库编号
+  Addr: 127.0.0.1:6379         # Redis 地址
+  Password: ""                 # Redis 密码
+  DB: 0                        # Redis 数据库编号
 
 ElasticSearch:
-  Url: http://127.0.0.1:9200 # ES 地址
-  Username: ""               # ES 用户名
-  Password: ""               # ES 密码
+  Url: http://127.0.0.1:9200   # ES 地址
+  Username: ""                 # ES 用户名
+  Password: ""                 # ES 密码
 
 Audit:
   LoginAuditIndex: gremote-login   # 登录审计索引前缀
   RecordAuditIndex: gremote-record # 操作审计索引前缀
 
 S3:
-  Endpoint: 127.0.0.1:9000   # MinIO 地址
-  AccessKeyID: xxx            # MinIO AccessKey
-  SecretAccessKey: xxx        # MinIO SecretKey
-  UseSSL: false               # 是否使用 HTTPS
-  Bucket: gremote             # 桶名
+  Endpoint: 127.0.0.1:9000     # MinIO 地址
+  AccessKeyID: xxx              # MinIO AccessKey
+  SecretAccessKey: xxx          # MinIO SecretKey
+  UseSSL: false                 # 是否使用 HTTPS
+  Bucket: gremote               # 桶名
 
 Guacd:
-  Host: 127.0.0.1            # guacd 地址
-  Port: 4822                  # guacd 端口
+  Host: 127.0.0.1              # guacd 地址
+  Port: 4822                    # guacd 端口
+  RecordingPath: /tmp/recordings  # 本地录像存储路径
+  GuacdPath: /recordings       # guacd 容器内录像路径
+  DefaultWidth: 1024            # RDP 默认窗口宽度
+  DefaultHeight: 768            # RDP 默认窗口高度
+  DefaultDPI: 96               # RDP 默认 DPI
+  SessionTimeout: 86400         # guacd 会话超时（秒），默认24小时
+
+GuacWorker:
+  URL: http://127.0.0.1:8081   # guac 录像转换服务地址
+  Timeout: 300                  # 转换超时（秒）
+
+Logger:
+  Filename: ./log/gremote.log  # 日志文件路径
+  MaxSize: 10                  # 单个日志文件最大大小（MB）
+  MaxBackups: 5                # 最多保留日志文件数
+  MaxAge: 7                    # 日志文件最大保留天数
+
+Display:
+  DisplayMode: all             # 页面显示模式：all | linux | windows
 ```
 
 ### Docker 部署
 
-Docker 部署通过环境变量管理配置，环境变量会覆盖 `config.yaml` 中的默认值：
+Docker 部署通过挂载 `config.yaml` 管理配置。直接修改项目中的 `backend/config/config.yaml`，重启后端容器即可生效：
 
-| 环境变量 | 说明 | 默认值 |
-|---------|------|--------|
-| `GREMOTE_SERVER_HOST` | 服务监听地址 | 0.0.0.0 |
-| `GREMOTE_SERVER_PORT` | 服务端口 | 8000 |
-| `GREMOTE_REDIS_ADDR` | Redis 地址 | 127.0.0.1:6379 |
-| `GREMOTE_ES_URL` | ES 地址 | http://127.0.0.1:9200 |
-| `GREMOTE_S3_ENDPOINT` | MinIO 地址 | 127.0.0.1:9000 |
-| `GREMOTE_S3_ACCESS_KEY_ID` | MinIO AccessKey | - |
-| `GREMOTE_S3_SECRET_ACCESS_KEY` | MinIO SecretKey | - |
-| `GREMOTE_S3_BUCKET` | 桶名 | gremote |
-| `GREMOTE_GUACD_HOST` | guacd 地址 | 127.0.0.1 |
-| `GREMOTE_GUACD_PORT` | guacd 端口 | 4822 |
-| `GREMOTE_GUACWORKER_URL` | Worker 服务地址 | http://127.0.0.1:8081 |
+```bash
+# 修改配置后重启后端
+docker compose up -d --build backend
+```
 
-> 配置优先级：环境变量 > config.yaml
->
-> 本地开发时 `config.yaml` 提供默认值，无需设置环境变量即可启动。
-> K8s 部署时通过 ConfigMap/Secret 注入 `GREMOTE_*` 环境变量覆盖默认值。
+> 后端支持 `GREMOTE_*` 环境变量覆盖 config.yaml 中的同名配置（通过 viper），适用于 K8s 等场景通过 ConfigMap/Secret 注入配置。
 
 ---
 
