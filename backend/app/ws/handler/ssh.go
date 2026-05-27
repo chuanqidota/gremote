@@ -1,12 +1,12 @@
-package view
+package handler
 
 import (
 	"encoding/json"
 	"net/http"
 	"time"
 	"gremote/app/api/params"
-	"gremote/app/ws/utils/loginAudit"
-	"gremote/app/ws/utils/recordAudit"
+	"gremote/app/audit/loginAudit"
+	"gremote/app/audit/recordAudit"
 	"gremote/pkg/asciinema"
 	"gremote/pkg/redis"
 	"gremote/pkg/terminal"
@@ -28,7 +28,7 @@ var upgrader = websocket.Upgrader{
 	Subprotocols: []string{"guacamole"},
 }
 
-func (w wsHandle) Handler(c *gin.Context) {
+func (w wsHandle) SSHHandler(c *gin.Context) {
 	// 升级http为ws
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -66,7 +66,7 @@ func (w wsHandle) Handler(c *gin.Context) {
 	}
 
 	// 登录信息写入到es中
-	e := loginAudit.NewEsAudit()
+	e := loginAudit.NewLoginAudit()
 	defer redis.DeleteKey(key)
 	auditData := map[string]any{
 		"key":       key,
@@ -111,7 +111,7 @@ func (w wsHandle) Handler(c *gin.Context) {
 
 	// 记录操作到es中
 	startTime := time.Now()
-	record := recordAudit.NewEsRecord()
+	record := recordAudit.NewRecordAudit()
 	asciinema.WriteHeader(key, cols, rows, startTime, record)
 
 	// 核心交互

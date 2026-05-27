@@ -1,13 +1,13 @@
 package cmd
 
 import (
-	"gremote/pkg/s3"
+	"gremote/pkg/minio"
 	"os"
 	"os/signal"
 
 	"context"
 	"gremote/config"
-	"gremote/pkg/es"
+	"gremote/pkg/elasticsearch"
 	"gremote/pkg/logger"
 	"gremote/pkg/redis"
 	"gremote/router"
@@ -47,8 +47,8 @@ func init() {
 		MaxAge:     config.Conf.Logger.MaxAge,
 	})
 	redis.Init()
-	es.Init()
-	s3.Init()
+	elasticsearch.Init()
+	minio.Init()
 }
 
 // Run 启动 HTTP 服务并监听系统中断信号实现优雅关闭

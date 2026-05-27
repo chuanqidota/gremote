@@ -1,23 +1,23 @@
-package view
+package handler
 
 import (
 	"bytes"
 	"fmt"
 	"time"
 	"gremote/app/api/params"
-	"gremote/app/ws/utils/recordAudit"
+	"gremote/app/audit/recordAudit"
 	"gremote/config"
-	"gremote/pkg/s3"
+	"gremote/pkg/minio"
 	"gremote/pkg/response"
 
 	"strings"
 	"gremote/pkg/redis"
 
-	"gremote/pkg/file"
+	"gremote/pkg/sftp"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"gremote/app/ws/utils/loginAudit"
+	"gremote/app/audit/loginAudit"
 )
 
 type apiHandle struct {
@@ -76,7 +76,7 @@ func (a *apiHandle) ListFile(c *gin.Context) {
 		response.Fail(c, fmt.Sprintf("没有登录信息-%s", err.Error()))
 		return
 	}
-	result, err := file.FileHandle.ListFile(info, listFileBody.Path)
+	result, err := sftp.Handler.List(info, listFileBody.Path)
 	if err != nil {
 		response.Fail(c, err.Error())
 		return
@@ -106,7 +106,7 @@ func (a *apiHandle) UploadFile(c *gin.Context) {
 		return
 	}
 
-	if err := file.FileHandle.UploadFile(fileObj, info, uploadFileBody.Path); err != nil {
+	if err := sftp.Handler.Upload(fileObj, info, uploadFileBody.Path); err != nil {
 		response.Fail(c, fmt.Sprintf("上传文件失败-%s", err.Error()))
 		return
 	}
@@ -130,7 +130,7 @@ func (a *apiHandle) DownLoadFile(c *gin.Context) {
 	}
 
 	filename := downLoadFileBody.FileName
-	res, err := file.FileHandle.DownLoadFile(info, downLoadFileBody.Path, downLoadFileBody.FileName)
+	res, err := sftp.Handler.Download(info, downLoadFileBody.Path, downLoadFileBody.FileName)
 	if err != nil {
 		response.Fail(c, fmt.Sprintf("执行失败-%s", err.Error()))
 		return
@@ -145,7 +145,7 @@ func (a *apiHandle) LoginAudit(c *gin.Context) {
 		response.Fail(c, fmt.Sprintf("传参出错-%s", err.Error()))
 		return
 	}
-	e := loginAudit.NewEsAudit()
+	e := loginAudit.NewLoginAudit()
 	res, count := e.ReadData(data)
 	result := map[string]any{
 		"result": res,
@@ -162,7 +162,7 @@ func (a *apiHandle) RecordUrl(c *gin.Context) {
 		return
 	}
 	// 从es中读取数据
-	record := recordAudit.NewEsRecord()
+	record := recordAudit.NewRecordAudit()
 	result := record.ReadData(key)
 
 	var buffer bytes.Buffer
@@ -173,7 +173,7 @@ func (a *apiHandle) RecordUrl(c *gin.Context) {
 	}
 
 	// 上传到S3中-会覆盖更新
-	if err := s3.UploadFile(key, buffer.Bytes()); err != nil {
+	if err := minio.UploadFile(key, buffer.Bytes()); err != nil {
 		response.Fail(c, fmt.Sprintf("上传录制文件失败-%s", err.Error()))
 		return
 	}
@@ -189,7 +189,7 @@ func (a *apiHandle) RecordFile(c *gin.Context) {
 		response.Fail(c, "参数错误")
 		return
 	}
-	data, err := s3.GetFile(key)
+	data, err := minio.GetFile(key)
 	if err != nil {
 		response.Fail(c, fmt.Sprintf("读取录制文件失败-%s", err.Error()))
 		return
@@ -206,7 +206,7 @@ func (a *apiHandle) RecordFileGuac(c *gin.Context) {
 		return
 	}
 	guacKey := fmt.Sprintf("%s.guac", key)
-	data, err := s3.GetFile(guacKey)
+	data, err := minio.GetFile(guacKey)
 	if err != nil {
 		response.Fail(c, fmt.Sprintf("读取RDP录制文件失败-%s", err.Error()))
 		return
@@ -217,7 +217,7 @@ func (a *apiHandle) RecordFileGuac(c *gin.Context) {
 
 // ListGuacFiles 列出S3中所有.guac录制文件（调试用）
 func (a *apiHandle) ListGuacFiles(c *gin.Context) {
-	files, err := s3.ListFiles("")
+	files, err := minio.ListFiles("")
 	if err != nil {
 		response.Fail(c, fmt.Sprintf("列出文件失败-%s", err.Error()))
 		return

@@ -1,4 +1,4 @@
-package file
+package sftp
 
 import (
 	"fmt"
@@ -16,18 +16,18 @@ import (
 	"gremote/pkg/terminal"
 )
 
-type fileHandle struct {
+type handler struct {
 }
 
-var FileHandle = new(fileHandle)
+var Handler = new(handler)
 
 // cleanPath 规范化远程文件路径，防止路径穿越
 func cleanPath(path string) string {
 	return filepath.Clean("/" + path)
 }
 
-// ListFile 查看文件列表
-func (f *fileHandle) ListFile(info params.Info, path string) ([]map[string]any, error) {
+// List 查看文件列表
+func (h *handler) List(info params.Info, path string) ([]map[string]any, error) {
 	path = cleanPath(path)
 	// 使用切片嵌套的map来存储目录和文件的大小和名称
 	result := make([]map[string]interface{}, 0)
@@ -81,8 +81,8 @@ func (f *fileHandle) ListFile(info params.Info, path string) ([]map[string]any, 
 
 }
 
-// UploadFile 上传文件
-func (f *fileHandle) UploadFile(file *multipart.FileHeader, info params.Info, path string) error {
+// Upload 上传文件
+func (h *handler) Upload(file *multipart.FileHeader, info params.Info, path string) error {
 	path = cleanPath(path)
 	// 初始化登录信息
 	target := info.Target
@@ -131,8 +131,8 @@ func (f *fileHandle) UploadFile(file *multipart.FileHeader, info params.Info, pa
 	return nil
 }
 
-// DownLoadFile 下载文件
-func (f *fileHandle) DownLoadFile(info params.Info, path string, filename string) ([]byte, error) {
+// Download 下载文件
+func (h *handler) Download(info params.Info, path string, filename string) ([]byte, error) {
 	path = cleanPath(path)
 	target := info.Target
 	username := info.Username

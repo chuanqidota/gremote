@@ -1,4 +1,4 @@
-package view
+package handler
 
 import (
 	"fmt"
@@ -6,12 +6,12 @@ import (
 	"sync"
 	"time"
 	"gremote/app/api/params"
-	"gremote/app/ws/utils/loginAudit"
+	"gremote/app/audit/loginAudit"
 	"gremote/config"
 	"gremote/pkg/guacamole"
 	"gremote/pkg/logger"
 	"gremote/pkg/redis"
-	"gremote/pkg/s3"
+	"gremote/pkg/minio"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -64,7 +64,7 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 	}
 
 	// 4. Write login audit to ES (with protocol: "rdp")
-	e := loginAudit.NewEsAudit()
+	e := loginAudit.NewLoginAudit()
 	defer redis.DeleteKey(key)
 	auditData := map[string]any{
 		"key":       key,
@@ -257,7 +257,7 @@ func (w wsHandle) RDPHandler(c *gin.Context) {
 	if len(data) > 0 {
 		uploaded := false
 		for i := 0; i < 10; i++ {
-			if err := s3.UploadFile(recordingKey, data); err != nil {
+			if err := minio.UploadFile(recordingKey, data); err != nil {
 				logger.Error(fmt.Sprintf("RDP recording S3 upload attempt %d failed: %s", i+1, err.Error()))
 				time.Sleep(500 * time.Millisecond)
 				continue

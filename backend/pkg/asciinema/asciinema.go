@@ -3,7 +3,7 @@ package asciinema
 import (
 	"encoding/json"
 	"time"
-	"gremote/app/ws/utils/recordAudit"
+	"gremote/app/audit/recordAudit"
 )
 
 // asciinema 文档https://docs.asciinema.org/manual/asciicast/v2/
@@ -20,7 +20,7 @@ type RecHeader struct {
 }
 
 // WriteHeader 写头部信息
-func WriteHeader(key string, cols, rows int, startTime time.Time, record *recordAudit.EsRecord) {
+func WriteHeader(key string, cols, rows int, startTime time.Time, record *recordAudit.RecordAudit) {
 	header := RecHeader{
 		Version:   2,
 		Width:     cols,
@@ -39,7 +39,7 @@ func WriteHeader(key string, cols, rows int, startTime time.Time, record *record
 }
 
 // WriteData 写入数据
-func WriteData(key string, startTime time.Time, out string, record *recordAudit.EsRecord) {
+func WriteData(key string, startTime time.Time, out string, record *recordAudit.RecordAudit) {
 	sub := float64(time.Since(startTime).Microseconds()) / float64(1000000)
 	history, _ := json.Marshal([]any{sub, "o", out})
 	data := map[string]any{
@@ -51,7 +51,7 @@ func WriteData(key string, startTime time.Time, out string, record *recordAudit.
 }
 
 // WriteInputData 写入用户输入数据
-func WriteInputData(key string, startTime time.Time, input string, record *recordAudit.EsRecord) {
+func WriteInputData(key string, startTime time.Time, input string, record *recordAudit.RecordAudit) {
 	sub := float64(time.Since(startTime).Microseconds()) / float64(1000000)
 	history, _ := json.Marshal([]any{sub, "i", input})
 	data := map[string]any{

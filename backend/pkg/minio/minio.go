@@ -1,4 +1,4 @@
-package s3
+package minio
 
 import (
 	"bytes"

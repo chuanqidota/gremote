@@ -9,7 +9,7 @@ import (
 	"io"
 	"sync"
 	"time"
-	"gremote/app/ws/utils/recordAudit"
+	"gremote/app/audit/recordAudit"
 	"gremote/pkg/asciinema"
 	"gremote/pkg/logger"
 )
@@ -105,7 +105,7 @@ func (t *Terminal) Close() {
 }
 
 // ReceiveWsMsg 接受ws消息 发送到terminal
-func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool, key string, startTime time.Time, record *recordAudit.EsRecord) {
+func (t *Terminal) ReceiveWsMsg(ws *websocket.Conn, quitChan chan bool, key string, startTime time.Time, record *recordAudit.RecordAudit) {
 	for {
 		select {
 		case <-quitChan:
@@ -185,7 +185,7 @@ func (t *Terminal) WriteWsMsg(ws *websocket.Conn, quitChan chan bool, esDataChan
 }
 
 // WriteEsData 写入到数据到es中
-func (t *Terminal) WriteEsData(quitChan chan bool, key string, startTime time.Time, record *recordAudit.EsRecord, esDataChan chan []byte) {
+func (t *Terminal) WriteEsData(quitChan chan bool, key string, startTime time.Time, record *recordAudit.RecordAudit, esDataChan chan []byte) {
 	for {
 		select {
 		case <-quitChan:

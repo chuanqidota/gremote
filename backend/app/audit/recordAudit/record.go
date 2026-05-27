@@ -4,19 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-	"gremote/app/ws/utils/esAudit"
+	"gremote/app/audit/esAudit"
 	"gremote/config"
-	"gremote/pkg/es"
+	"gremote/pkg/elasticsearch"
 )
 
-// EsRecord 操作录制审计，继承 ES 基础写入能力
-type EsRecord struct {
+// RecordAudit 操作录制审计，继承 ES 基础写入能力
+type RecordAudit struct {
 	esAudit.Base
 }
 
-// NewEsRecord 创建操作录制审计实例，索引按月分区
-func NewEsRecord() *EsRecord {
-	return &EsRecord{
+// NewRecordAudit 创建操作录制审计实例，索引按月分区
+func NewRecordAudit() *RecordAudit {
+	return &RecordAudit{
 		Base: esAudit.Base{
 			Index: fmt.Sprintf("%s-%s", config.Conf.Audit.RecordAuditIndex, time.Now().Format("2006-01")),
 			Mappings: `{
@@ -31,7 +31,7 @@ func NewEsRecord() *EsRecord {
 }
 
 // ReadData 按会话 key 分页读取所有录制事件，按时间戳升序排列
-func (e *EsRecord) ReadData(key string) []map[string]any {
+func (e *RecordAudit) ReadData(key string) []map[string]any {
 	result := make([]map[string]any, 0)
 	pageNum := 1
 	pageSize := 10000
@@ -55,7 +55,7 @@ func (e *EsRecord) ReadData(key string) []map[string]any {
 		if err != nil {
 			return result
 		}
-		res, _ := es.Search(e.Index, string(queryB))
+		res, _ := elasticsearch.Search(e.Index, string(queryB))
 		if len(res) == 0 {
 			break
 		}

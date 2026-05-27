@@ -1,4 +1,4 @@
-package view
+package handler
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"gremote/config"
 	"gremote/pkg/logger"
 	"gremote/pkg/response"
-	"gremote/pkg/s3"
+	"gremote/pkg/minio"
 
 	"github.com/gin-gonic/gin"
 )
@@ -46,7 +46,7 @@ func (a *apiHandle) ConvertGuac(c *gin.Context) {
 
 	// Check if MP4 already exists
 	mp4Key := fmt.Sprintf("%s.mp4", key)
-	if _, err := s3.GetFile(mp4Key); err == nil {
+	if _, err := minio.GetFile(mp4Key); err == nil {
 		converting.Delete(key)
 		response.Success(c, "MP4已存在", nil)
 		return
@@ -113,7 +113,7 @@ func (a *apiHandle) ConvertStatus(c *gin.Context) {
 
 	// Check if MP4 exists in S3
 	mp4Key := fmt.Sprintf("%s.mp4", key)
-	_, err := s3.GetFile(mp4Key)
+	_, err := minio.GetFile(mp4Key)
 	if err != nil {
 		// Check if conversion is in progress
 		_, converting := converting.Load(key)
@@ -138,7 +138,7 @@ func (a *apiHandle) RecordFileMP4(c *gin.Context) {
 		return
 	}
 	mp4Key := fmt.Sprintf("%s.mp4", key)
-	data, err := s3.GetFile(mp4Key)
+	data, err := minio.GetFile(mp4Key)
 	if err != nil {
 		response.Fail(c, fmt.Sprintf("读取MP4录制文件失败-%s", err.Error()))
 		return
