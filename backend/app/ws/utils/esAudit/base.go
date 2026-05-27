@@ -6,11 +6,13 @@ import (
 	"gremote/pkg/logger"
 )
 
+// Base ES 审计写入基础结构，提供索引名和 mapping 定义
 type Base struct {
-	Index    string
-	Mappings string
+	Index    string // ES 索引名（按月分区，如 gremote-login-2024-01）
+	Mappings string // ES 索引 mapping JSON
 }
 
+// WriteData 将审计数据写入 ES，索引不存在时自动创建
 func (b *Base) WriteData(data map[string]any) {
 	logger.Info(fmt.Sprintf("存es的日志数据-%v", data))
 	if !es.IsExistsIndex(b.Index) {

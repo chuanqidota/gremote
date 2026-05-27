@@ -19,7 +19,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// rootCmd represents the base command when called without any subcommands
+// rootCmd Cobra 根命令，启动后调用 Run() 启动 HTTP 服务
 var rootCmd = &cobra.Command{
 	Use:   "gremote",
 	Short: "Go Remote Terminal",
@@ -29,6 +29,7 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+// Execute 执行 Cobra 根命令，程序入口
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
@@ -36,6 +37,7 @@ func Execute() {
 	}
 }
 
+// init 按顺序初始化各组件：配置 → 日志 → Redis → Elasticsearch → S3
 func init() {
 	config.Init()
 	logger.Init(logger.LogConfig{
@@ -49,6 +51,7 @@ func init() {
 	s3.Init()
 }
 
+// Run 启动 HTTP 服务并监听系统中断信号实现优雅关闭
 func Run() {
 	addr := fmt.Sprintf("%s:%d", config.Conf.Server.Host, config.Conf.Server.Port)
 	server := &http.Server{
@@ -58,6 +61,7 @@ func Run() {
 		WriteTimeout:   time.Duration(config.Conf.Server.WriteTimeout) * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
+	// 优雅关闭：监听中断信号，收到后等待进行中的请求完成
 	go func() {
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt)

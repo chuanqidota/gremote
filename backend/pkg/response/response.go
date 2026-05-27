@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Success 返回成功响应（code=1）
 func Success(c *gin.Context, msg string, data any) {
 	c.JSON(http.StatusOK, gin.H{
 		"msg":  msg,
@@ -15,6 +16,7 @@ func Success(c *gin.Context, msg string, data any) {
 	})
 }
 
+// Fail 返回失败响应（code=0，HTTP 400）
 func Fail(c *gin.Context, msg string) {
 	c.JSON(http.StatusBadRequest, gin.H{
 		"msg":  msg,
@@ -30,6 +32,7 @@ func File(c *gin.Context, filename string, res []byte) {
 
 }
 
+// KeyRes 返回会话密钥响应
 func KeyRes(c *gin.Context, key string) {
 	c.JSON(http.StatusOK, gin.H{
 		"key": key,

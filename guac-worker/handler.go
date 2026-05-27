@@ -13,9 +13,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
+// ConvertRequest 转换请求参数
 type ConvertRequest struct {
 	Key        string `json:"key" binding:"required"`
 	Resolution string `json:"resolution"`
@@ -23,25 +23,18 @@ type ConvertRequest struct {
 	Quality    int    `json:"quality"`
 }
 
+// ConvertResponse 转换结果响应
 type ConvertResponse struct {
 	Success bool   `json:"success"`
 	Error   string `json:"error,omitempty"`
 }
 
+// handleConvert 处理 .guac → MP4 转换请求
+// 流程：S3 下载 .guac → guacenc 转 .m4v → ffmpeg 转 H.264 MP4 → 上传 S3
 func handleConvert(c *gin.Context) {
 	var req ConvertRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ConvertResponse{Error: fmt.Sprintf("invalid request: %v", err)})
-		return
-	}
-
-	// Init S3 client
-	s3Client, err := minio.New(cfg.S3.Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(cfg.S3.AccessKey, cfg.S3.SecretKey, ""),
-		Secure: cfg.S3.UseSSL,
-	})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, ConvertResponse{Error: fmt.Sprintf("failed to init s3 client: %v", err)})
 		return
 	}
 

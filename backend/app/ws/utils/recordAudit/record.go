@@ -9,10 +9,12 @@ import (
 	"gremote/pkg/es"
 )
 
+// EsRecord 操作录制审计，继承 ES 基础写入能力
 type EsRecord struct {
 	esAudit.Base
 }
 
+// NewEsRecord 创建操作录制审计实例，索引按月分区
 func NewEsRecord() *EsRecord {
 	return &EsRecord{
 		Base: esAudit.Base{
@@ -28,6 +30,7 @@ func NewEsRecord() *EsRecord {
 	}
 }
 
+// ReadData 按会话 key 分页读取所有录制事件，按时间戳升序排列
 func (e *EsRecord) ReadData(key string) []map[string]any {
 	result := make([]map[string]any, 0)
 	pageNum := 1

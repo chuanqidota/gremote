@@ -10,10 +10,12 @@ import (
 	"gremote/pkg/es"
 )
 
+// EsAudit 登录审计，继承 ES 基础写入能力
 type EsAudit struct {
 	esAudit.Base
 }
 
+// NewEsAudit 创建登录审计实例，索引按月分区
 func NewEsAudit() *EsAudit {
 	return &EsAudit{
 		Base: esAudit.Base{
@@ -33,10 +35,12 @@ func NewEsAudit() *EsAudit {
 	}
 }
 
+// UpdateEndTime 会话结束时更新审计记录的 endTime 字段
 func (e *EsAudit) UpdateEndTime(keyValue string) {
 	es.UpdateByField(e.Index, "key", keyValue, "endTime", time.Now().Format("2006-01-02 15:04:05"))
 }
 
+// ReadData 根据查询条件分页读取登录审计记录，支持按用户/源地址/目标/协议/时间范围筛选
 func (e *EsAudit) ReadData(data params.LoginAuditQuery) ([]map[string]any, int64) {
 	user := data.User
 	source := data.Source

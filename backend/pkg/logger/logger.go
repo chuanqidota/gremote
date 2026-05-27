@@ -10,6 +10,7 @@ import (
 
 var logger = logrus.New()
 
+// LogConfig 日志配置，控制日志文件路径和轮转策略
 type LogConfig struct {
 	Filename   string
 	MaxSize    int
@@ -17,6 +18,7 @@ type LogConfig struct {
 	MaxAge     int
 }
 
+// Init 初始化日志系统，配置文件轮转和控制台双输出
 func Init(cfg ...LogConfig) {
 	var logConf LogConfig
 	if len(cfg) > 0 {
@@ -51,14 +53,17 @@ func Init(cfg ...LogConfig) {
 	logger.SetOutput(io.MultiWriter(logFile, os.Stdout))
 }
 
+// Info 记录 INFO 级别日志
 func Info(args ...interface{}) {
 	logger.Info(args...)
 }
 
+// Error 记录 ERROR 级别日志
 func Error(args ...interface{}) {
 	logger.Error(args...)
 }
 
+// Debug 记录 DEBUG 级别日志
 func Debug(args ...interface{}) {
 	logger.Debug(args...)
 }

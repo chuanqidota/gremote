@@ -194,37 +194,15 @@ func Search(index string, query string) (result []map[string]any, count int64) {
 	}
 }
 
-// UpdateByField 根据字段进行更新
+// UpdateByField 根据字段查询并更新指定字段的值
 func UpdateByField(index, byField, ByValue, ChField, ChValue string) {
 	if !IsReady() {
 		return
 	}
-	// 构建查询条件
-	termQuery := elastic.NewTermQuery(byField, ByValue)
-	// 执行查询
-	searchResult, err := ElasticSearch.Search().
-		Index(index).
-		Query(termQuery).
-		Do(context.Background())
+	query := elastic.NewTermQuery(byField, ByValue)
+	script := elastic.NewScript("ctx._source."+ChField+" = '"+ChValue+"'")
+	_, err := ElasticSearch.UpdateByQuery().Index(index).Query(query).Script(script).Do(context.Background())
 	if err != nil {
-		logger.Error(fmt.Sprintf("查询出错-%s", err.Error()))
-		return
-	}
-	for _, hit := range searchResult.Hits.Hits {
-		// 提取文档 ID
-		docID := hit.Id
-
-		// 创建更新请求
-		updateRequest := elastic.NewBulkUpdateRequest().
-			Index(index).
-			Id(docID).
-			Doc(map[string]interface{}{ChField: ChValue})
-
-		// 将更新请求添加到批量操作中
-		_, err := ElasticSearch.Bulk().Add(updateRequest).Do(context.Background())
-		if err != nil {
-			// 处理错误
-			logger.Error(fmt.Sprintf("更新出错-%s", err.Error()))
-		}
+		logger.Error(fmt.Sprintf("更新出错-%s", err.Error()))
 	}
 }

@@ -8,9 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Engine 创建并返回 Gin 路由引擎，注册所有 REST API 和 WebSocket 路由
 func Engine() *gin.Engine {
 	router := gin.Default()
 
+	// REST API 路由组：会话管理、文件操作、审计查询、录制回放等
 	api := router.Group("api/v1").Use(middleware.CORSMiddleware())
 	{
 		api.POST("obtain-key", apiview.ApiHandle.ObtainKey)
@@ -29,6 +31,7 @@ func Engine() *gin.Engine {
 		api.GET("config", apiview.ApiHandle.GetConfig)
 	}
 
+	// WebSocket 路由组：SSH 终端和 RDP 远程桌面
 	ws := router.Group("ws/v1").Use(middleware.CORSMiddleware())
 	{
 		ws.GET(":key", wsview.WsHandle.Handler)

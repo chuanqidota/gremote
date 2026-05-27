@@ -93,6 +93,9 @@ func Init() {
 	if err := viper.Unmarshal(&Conf); err != nil {
 		logger.Error(fmt.Sprintf("解析配置文件失败:%s", err.Error()))
 	}
+	if err := Validate(); err != nil {
+		logger.Error(fmt.Sprintf("配置校验失败:%s", err.Error()))
+	}
 	logger.Info("配置文件加载完成")
 }
 
