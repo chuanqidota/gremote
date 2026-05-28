@@ -50,7 +50,8 @@ type GuacdConfig struct {
 	DefaultWidth   int    `yaml:"DefaultWidth" comment:"RDP默认宽度"`
 	DefaultHeight  int    `yaml:"DefaultHeight" comment:"RDP默认高度"`
 	DefaultDPI     int    `yaml:"DefaultDPI" comment:"RDP默认DPI"`
-	SessionTimeout int    `yaml:"SessionTimeout" comment:"RDP会话超时（秒）"`
+	SessionTimeout    int    `yaml:"SessionTimeout" comment:"RDP会话超时（秒）"`
+	GuacSizeThreshold int64  `yaml:"GuacSizeThreshold" comment:"触发自动转MP4的.guac文件大小阈值（字节），默认50MB"`
 }
 
 type GuacWorkerConfig struct {
@@ -92,6 +93,9 @@ func Init() {
 	viper.AutomaticEnv()
 	if err := viper.Unmarshal(&Conf); err != nil {
 		logger.Error(fmt.Sprintf("解析配置文件失败:%s", err.Error()))
+	}
+	if Conf.Guacd.GuacSizeThreshold == 0 {
+		Conf.Guacd.GuacSizeThreshold = 50 * 1024 * 1024 // 50MB
 	}
 	if err := Validate(); err != nil {
 		logger.Error(fmt.Sprintf("配置校验失败:%s", err.Error()))
