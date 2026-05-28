@@ -237,3 +237,23 @@ func (a *apiHandle) GetConfig(c *gin.Context) {
 		"display_mode": config.Conf.Display.DisplayMode,
 	})
 }
+
+// RecordFileSize 获取.guac录制文件大小，返回是否需要转换
+func (a *apiHandle) RecordFileSize(c *gin.Context) {
+	key := c.Query("key")
+	if key == "" {
+		response.Fail(c, "参数错误")
+		return
+	}
+	guacKey := fmt.Sprintf("%s.guac", key)
+	size, err := minio.GetFileSize(guacKey)
+	if err != nil {
+		response.Fail(c, fmt.Sprintf("获取录制文件大小失败-%s", err.Error()))
+		return
+	}
+	threshold := config.Conf.Guacd.GuacSizeThreshold
+	response.Success(c, "执行成功", gin.H{
+		"size":          size,
+		"should_convert": size >= threshold,
+	})
+}
