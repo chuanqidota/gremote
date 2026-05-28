@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/minio/minio-go/v7"
@@ -18,10 +19,18 @@ type Config struct {
 		Bucket    string `mapstructure:"bucket"`
 		UseSSL    bool   `mapstructure:"use_ssl"`
 	} `mapstructure:"s3"`
+	ConvertTimeout int `mapstructure:"convert_timeout"` // 每步转换超时（秒），默认600
 }
 
 var cfg Config
 var s3Client *minio.Client
+
+func getConvertTimeout() time.Duration {
+	if cfg.ConvertTimeout > 0 {
+		return time.Duration(cfg.ConvertTimeout) * time.Second
+	}
+	return 600 * time.Second // default 10 minutes
+}
 
 // InitConfig 从 config.yaml 加载配置，支持环境变量覆盖
 func InitConfig() {

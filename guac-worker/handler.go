@@ -94,9 +94,9 @@ func handleConvert(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, ConvertResponse{Error: fmt.Sprintf("guacenc failed: %v", err)})
 			return
 		}
-	case <-time.After(5 * time.Minute):
+	case <-time.After(getConvertTimeout()):
 		cmd.Process.Kill()
-		c.JSON(http.StatusGatewayTimeout, ConvertResponse{Error: "guacenc conversion timed out after 5 minutes"})
+		c.JSON(http.StatusGatewayTimeout, ConvertResponse{Error: fmt.Sprintf("guacenc conversion timed out after %v", getConvertTimeout())})
 		return
 	}
 
@@ -118,9 +118,9 @@ func handleConvert(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, ConvertResponse{Error: fmt.Sprintf("ffmpeg re-encode failed: %v", err)})
 			return
 		}
-	case <-time.After(5 * time.Minute):
+	case <-time.After(getConvertTimeout()):
 		ffmpegCmd.Process.Kill()
-		c.JSON(http.StatusGatewayTimeout, ConvertResponse{Error: "ffmpeg re-encode timed out after 5 minutes"})
+		c.JSON(http.StatusGatewayTimeout, ConvertResponse{Error: fmt.Sprintf("ffmpeg re-encode timed out after %v", getConvertTimeout())})
 		return
 	}
 
