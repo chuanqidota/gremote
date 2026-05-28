@@ -49,6 +49,11 @@ export function getRecordFileMP4Url(key: string): string {
   return `/api/v1/record-file-mp4?key=${encodeURIComponent(key)}`
 }
 
+export async function getRecordFileSize(key: string): Promise<{ size: number; should_convert: boolean }> {
+  const { data } = await http.get('/record-file-size', { params: { key } })
+  return data.data
+}
+
 export async function getConvertStatus(key: string): Promise<{ converted: boolean; converting?: boolean; mp4_url?: string }> {
   const { data } = await http.get('/convert-status', { params: { key } })
   return data.data
