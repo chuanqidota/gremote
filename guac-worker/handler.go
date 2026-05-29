@@ -5,10 +5,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -29,8 +31,46 @@ type ConvertResponse struct {
 	Error   string `json:"error,omitempty"`
 }
 
-// handleConvert 处理 .guac → MP4 转换请求
-// 流程：S3 下载 .guac → guacenc 转 .m4v → ffmpeg 转 H.264 MP4 → 上传 S3
+// ConvertProgress 转换进度
+type ConvertProgress struct {
+	Step    string `json:"step"`           // downloading | encoding | remuxing | uploading
+	Percent int    `json:"percent"`        // 0-100
+	Error   string `json:"error,omitempty"`
+}
+
+var (
+	progressMap   = make(map[string]*ConvertProgress)
+	progressMapMu sync.RWMutex
+)
+
+func setProgress(key, step string, percent int) {
+	progressMapMu.Lock()
+	defer progressMapMu.Unlock()
+	progressMap[key] = &ConvertProgress{Step: step, Percent: percent}
+}
+
+func setError(key string, err string) {
+	progressMapMu.Lock()
+	defer progressMapMu.Unlock()
+	progressMap[key] = &ConvertProgress{Error: err}
+}
+
+func getProgress(key string) *ConvertProgress {
+	progressMapMu.RLock()
+	defer progressMapMu.RUnlock()
+	if p, ok := progressMap[key]; ok {
+		return p
+	}
+	return nil
+}
+
+func clearProgress(key string) {
+	progressMapMu.Lock()
+	defer progressMapMu.Unlock()
+	delete(progressMap, key)
+}
+
+// handleConvert 处理 .guac → MP4 转换请求（异步）
 func handleConvert(c *gin.Context) {
 	var req ConvertRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -38,48 +78,53 @@ func handleConvert(c *gin.Context) {
 		return
 	}
 
+	// Check if already converting
+	if p := getProgress(req.Key); p != nil && p.Error == "" {
+		c.JSON(http.StatusOK, ConvertResponse{Success: true})
+		return
+	}
+
+	setProgress(req.Key, "starting", 0)
+	go doConvert(req.Key)
+	c.JSON(http.StatusAccepted, ConvertResponse{Success: true})
+}
+
+func doConvert(key string) {
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "guac-convert-*")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ConvertResponse{Error: fmt.Sprintf("failed to create temp dir: %v", err)})
+		setError(key, fmt.Sprintf("failed to create temp dir: %v", err))
 		return
 	}
 	defer os.RemoveAll(tmpDir)
 
 	inputPath := filepath.Join(tmpDir, "input.guac")
 
-	// Download .guac from S3
-	guacKey := fmt.Sprintf("%s.guac", req.Key)
+	// Step 1: Download .guac from S3
+	setProgress(key, "downloading", 5)
+	guacKey := fmt.Sprintf("%s.guac", key)
 	obj, err := s3Client.GetObject(context.Background(), cfg.S3.Bucket, guacKey, minio.GetObjectOptions{})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ConvertResponse{Error: fmt.Sprintf("failed to get .guac from s3: %v", err)})
+		setError(key, fmt.Sprintf("failed to get .guac from s3: %v", err))
 		return
 	}
 	defer obj.Close()
 
 	guacData, err := io.ReadAll(obj)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ConvertResponse{Error: fmt.Sprintf("failed to read .guac data: %v", err)})
+		setError(key, fmt.Sprintf("failed to read .guac data: %v", err))
 		return
 	}
 
-	// Write .guac file
 	if err := os.WriteFile(inputPath, guacData, 0644); err != nil {
-		c.JSON(http.StatusInternalServerError, ConvertResponse{Error: fmt.Sprintf("failed to write input file: %v", err)})
+		setError(key, fmt.Sprintf("failed to write input file: %v", err))
 		return
 	}
+	setProgress(key, "downloading", 25)
 
-	// Build guacenc command (output is auto-named {input}.m4v)
-	guacArgs := []string{"-f"}
-	if req.Resolution != "" {
-		guacArgs = append(guacArgs, "-s", req.Resolution)
-	}
-	if req.Framerate > 0 {
-		guacArgs = append(guacArgs, "-r", fmt.Sprintf("%d", req.Framerate))
-	}
-	guacArgs = append(guacArgs, inputPath)
-
-	// Run guacenc with timeout
+	// Step 2: Run guacenc
+	setProgress(key, "encoding", 25)
+	guacArgs := []string{"-f", inputPath}
 	cmd := exec.Command("guacenc", guacArgs...)
 	cmd.Dir = tmpDir
 
@@ -92,16 +137,18 @@ func handleConvert(c *gin.Context) {
 	select {
 	case err := <-done:
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, ConvertResponse{Error: fmt.Sprintf("guacenc failed: %v", err)})
+			setError(key, fmt.Sprintf("guacenc failed: %v", err))
 			return
 		}
 	case <-time.After(timeout):
 		cmd.Process.Kill()
-		c.JSON(http.StatusGatewayTimeout, ConvertResponse{Error: fmt.Sprintf("guacenc conversion timed out after %d seconds", int(timeout.Seconds()))})
+		setError(key, fmt.Sprintf("guacenc timed out after %d seconds", int(timeout.Seconds())))
 		return
 	}
+	setProgress(key, "encoding", 60)
 
-	// guacenc outputs MPEG-4 Part 2 (.m4v), re-encode to H.264 for browser compatibility
+	// Step 3: ffmpeg re-encode to H.264
+	setProgress(key, "remuxing", 60)
 	guacOutput := inputPath + ".m4v"
 	h264Output := filepath.Join(tmpDir, "output.mp4")
 
@@ -117,29 +164,52 @@ func handleConvert(c *gin.Context) {
 	select {
 	case err := <-ffmpegDone:
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, ConvertResponse{Error: fmt.Sprintf("ffmpeg re-encode failed: %v", err)})
+			setError(key, fmt.Sprintf("ffmpeg re-encode failed: %v", err))
 			return
 		}
 	case <-time.After(ffmpegTimeout):
 		ffmpegCmd.Process.Kill()
-		c.JSON(http.StatusGatewayTimeout, ConvertResponse{Error: fmt.Sprintf("ffmpeg re-encode timed out after %d seconds", int(ffmpegTimeout.Seconds()))})
+		setError(key, fmt.Sprintf("ffmpeg timed out after %d seconds", int(ffmpegTimeout.Seconds())))
 		return
 	}
+	setProgress(key, "remuxing", 85)
 
-	// Read H.264 MP4
+	// Step 4: Upload MP4 to S3
+	setProgress(key, "uploading", 85)
 	mp4Data, err := os.ReadFile(h264Output)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ConvertResponse{Error: fmt.Sprintf("failed to read output file: %v", err)})
+		setError(key, fmt.Sprintf("failed to read output file: %v", err))
 		return
 	}
 
-	// Upload MP4 to S3
-	mp4Key := fmt.Sprintf("%s.mp4", req.Key)
+	mp4Key := fmt.Sprintf("%s.mp4", key)
 	_, err = s3Client.PutObject(context.Background(), cfg.S3.Bucket, mp4Key, bytes.NewReader(mp4Data), int64(len(mp4Data)), minio.PutObjectOptions{})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ConvertResponse{Error: fmt.Sprintf("failed to upload mp4 to s3: %v", err)})
+		setError(key, fmt.Sprintf("failed to upload mp4 to s3: %v", err))
 		return
 	}
+	setProgress(key, "done", 100)
 
-	c.JSON(http.StatusOK, ConvertResponse{Success: true})
+	// Clear progress after 5 minutes
+	go func() {
+		time.Sleep(5 * time.Minute)
+		clearProgress(key)
+	}()
+
+	log.Printf("Conversion completed: key=%s", key)
+}
+
+// handleProgress 查询转换进度
+func handleProgress(c *gin.Context) {
+	key := c.Query("key")
+	if key == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "key is required"})
+		return
+	}
+	p := getProgress(key)
+	if p == nil {
+		c.JSON(http.StatusOK, gin.H{"step": "", "percent": 0})
+		return
+	}
+	c.JSON(http.StatusOK, p)
 }

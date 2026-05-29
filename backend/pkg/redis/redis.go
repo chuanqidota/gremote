@@ -33,17 +33,13 @@ func Init() {
 	logger.Info(fmt.Sprintf("redis连接成功信息：%v", client))
 }
 
-// Set 设置指定键
+// Set 设置指定键，值会被 JSON 序列化后存储
 func Set(key string, value any, expiration time.Duration) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
-	if err := RedisClient.Set(context.Background(), key, data, expiration).Err(); err != nil {
-		return err
-	} else {
-		return nil
-	}
+	return RedisClient.Set(context.Background(), key, data, expiration).Err()
 }
 
 // Get 获取值 value 是传入的值
@@ -55,11 +51,11 @@ func Get(key string, value any) error {
 	return json.Unmarshal(result, value)
 }
 
-// DeleteKey 删除指定的键
+// DeleteKey 删除会话键及其关联的连接标记键
 func DeleteKey(key string) {
-	isConnectedKey := key+"_connected"
+	isConnectedKey := key + "_connected"
 	RedisClient.Del(context.Background(), key)
-	RedisClient.Del(context.Background(),isConnectedKey)
+	RedisClient.Del(context.Background(), isConnectedKey)
 }
 
 // IsConnected 判断有没有连接过

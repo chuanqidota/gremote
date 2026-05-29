@@ -33,7 +33,6 @@ Guacd:
   DefaultHeight: 768
   DefaultDPI: 96
   SessionTimeout: 86400
-  GuacSizeThreshold: 52428800  # 触发自动转MP4的.guac文件大小阈值（字节），默认50MB
 
 GuacWorker:
   URL: http://127.0.0.1:8081

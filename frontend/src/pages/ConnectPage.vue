@@ -1,12 +1,6 @@
 <template>
   <div class="connect-page">
-    <div class="top-nav">
-      <div class="nav-left">
-        <span class="nav-brand">GRemote</span>
-        <span class="nav-tag">控制台</span>
-      </div>
-      <span class="nav-link" @click="$router.push('/audit')">审计日志 →</span>
-    </div>
+    <TopNav link-text="审计日志 →" to="/audit" />
     <div class="connect-body">
       <div class="connect-card">
         <el-tabs v-model="activeTab" class="connect-tabs">
@@ -90,24 +84,21 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { obtainKey, obtainKeyRDP, getConfig } from '../api'
+import { obtainKey, obtainKeyRDP } from '../api'
+import { extractErrorMessage } from '../utils/error'
+import { useDisplayMode } from '../composables/useDisplayMode'
+import TopNav from '../components/TopNav.vue'
 import type { SSHInfo, RDPInfo } from '../types'
 
 const activeTab = ref('ssh')
 const loading = ref(false)
-const displayMode = ref('all')
+const { displayMode } = useDisplayMode()
 
-onMounted(async () => {
-  try {
-    const config = await getConfig()
-    displayMode.value = config.display_mode || 'all'
-    if (displayMode.value === 'windows') {
-      activeTab.value = 'rdp'
-    }
-  } catch {
-    displayMode.value = 'all'
+watch(displayMode, (mode) => {
+  if (mode === 'windows') {
+    activeTab.value = 'rdp'
   }
 })
 
@@ -150,7 +141,7 @@ async function connectSSH() {
     const key = await obtainKey(sshForm)
     window.open(`/term?key=${key}`, '_blank')
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.msg || e?.message || '连接失败')
+    ElMessage.error(extractErrorMessage(e, '连接失败'))
   } finally {
     loading.value = false
   }
@@ -164,7 +155,7 @@ async function connectRDP() {
     const key = await obtainKeyRDP(rdpForm)
     window.open(`/rdp?key=${key}&host=${rdpForm.target}`, '_blank')
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.msg || e?.message || '连接失败')
+    ElMessage.error(extractErrorMessage(e, '连接失败'))
   } finally {
     loading.value = false
   }
@@ -177,43 +168,6 @@ async function connectRDP() {
   flex-direction: column;
   min-height: 100vh;
   background: #f0f2f5;
-}
-
-.top-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 44px;
-  padding: 0 20px;
-  background: #fff;
-  border-bottom: 1px solid #e8e8e8;
-  flex-shrink: 0;
-}
-
-.nav-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.nav-brand {
-  font-weight: 700;
-  font-size: 15px;
-  color: #006eff;
-}
-
-.nav-tag {
-  font-size: 11px;
-  color: #909399;
-  background: #f0f2f5;
-  padding: 1px 6px;
-  border-radius: 2px;
-}
-
-.nav-link {
-  font-size: 13px;
-  color: #006eff;
-  cursor: pointer;
 }
 
 .connect-body {

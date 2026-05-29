@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { listFiles, uploadFile, getDownloadUrl } from '../api'
+import { extractErrorMessage } from '../utils/error'
 import type { FileItem } from '../types'
 
 export function useFileManager(key: string) {
@@ -15,7 +16,7 @@ export function useFileManager(key: string) {
       files.value = await listFiles(key, path)
       currentPath.value = path
     } catch (e: any) {
-      error.value = e?.response?.data?.msg || e?.message || 'Failed to list files'
+      error.value = extractErrorMessage(e, 'Failed to list files')
     } finally {
       loading.value = false
     }
@@ -27,7 +28,7 @@ export function useFileManager(key: string) {
     try {
       await uploadFile(key, path, file)
     } catch (e: any) {
-      error.value = e?.response?.data?.msg || e?.message || 'Upload failed'
+      error.value = extractErrorMessage(e, 'Upload failed')
       throw e
     } finally {
       loading.value = false

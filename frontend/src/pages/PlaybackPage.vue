@@ -24,20 +24,12 @@
       </div>
     </div>
 
-    <div v-else-if="showConvertError" class="error">
-      <p>{{ convertError }}</p>
-      <div class="error-actions">
-        <el-button @click="fallbackToGuac">使用原始格式播放</el-button>
-        <el-button @click="$router.back()">返回</el-button>
-      </div>
-    </div>
-
     <template v-else>
       <div ref="playerContainer" class="player-container" />
       <div v-if="isSeeking" class="seek-overlay">
         <span>正在跳转... {{ Math.round(seekProgressVal * 100) }}%</span>
       </div>
-      <div class="playback-controls">
+      <div v-if="!isRdp || !mp4Url" class="playback-controls">
         <el-button size="small" @click="togglePlay">{{ paused ? '▶ 播放' : '⏸ 暂停' }}</el-button>
         <el-slider :model-value="progress" :max="100" :show-tooltip="true" :format-tooltip="fmtTooltip" style="flex: 1" @change="onSeek" />
         <span class="time-display">{{ fmtTime(currentTime) }} / {{ fmtTime(totalDuration) }}</span>
@@ -66,7 +58,7 @@ import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
 import { FullScreen, Close } from '@element-plus/icons-vue'
 import { useAudit } from '../composables/useAudit'
-import { useGuacPlayback } from '../composables/useGuacPlayback'
+import { useFullscreen } from '../composables/useFullscreen'
 
 interface AsciinemaEvent { time: number; type: string; data: string }
 
@@ -75,18 +67,27 @@ const key = route.query.key as string
 const protocol = (route.query.protocol as string) || 'ssh'
 const isRdp = protocol === 'rdp'
 
-const { fetchRecordUrl, fetchGuacRecordUrl, getConvertStatus, triggerConvert, getRecordFileSize, getRecordFileGuacUrl } = useAudit()
-const guacPlayback = useGuacPlayback()
+const { fetchRecordUrl, fetchConvertStatus, fetchTriggerConvert } = useAudit()
 const playerContainer = ref<HTMLDivElement>()
-const isFullscreen = ref(false)
 const mp4Url = ref('')
 const converting = ref(false)
 const convertError = ref('')
 let pollTimer: ReturnType<typeof setInterval> | null = null
-const CONVERT_POLL_INTERVAL = 3000
-const CONVERT_POLL_TIMEOUT = 10 * 60 * 1000 // 10 minutes
 
-// --- Unified state (RDP uses guacPlayback, SSH uses local refs) ---
+const { isFullscreen, toggleFullscreen } = useFullscreen(onFullscreenChange)
+
+const stepLabels: Record<string, string> = {
+  starting: '准备中...',
+  downloading: '正在下载录制文件...',
+  encoding: '正在编码...',
+  remuxing: '正在转码...',
+  uploading: '正在上传...',
+  done: '转换完成',
+}
+const convertStep = ref('')
+const convertPercent = ref(0)
+
+// --- Unified state ---
 const ssh = isRdp ? null : {
   loading: ref(true),
   error: ref(''),
@@ -97,23 +98,25 @@ const ssh = isRdp ? null : {
 }
 
 const sshSpeed = ref(1)
-const playbackSpeed = computed(() => isRdp ? guacPlayback.playbackSpeed.value : sshSpeed.value)
+const playbackSpeed = computed(() => isRdp ? 1 : sshSpeed.value)
 
-const showLoading = computed(() => isRdp ? (guacPlayback.loading.value || converting.value) : ssh!.loading.value)
-const showError = computed(() => isRdp ? guacPlayback.error.value : ssh!.error.value)
-const errorMsg = computed(() => isRdp ? guacPlayback.error.value : ssh!.error.value)
-const paused = computed(() => isRdp ? guacPlayback.paused.value : ssh!.paused.value)
-const progress = computed(() => isRdp ? guacPlayback.progress.value : ssh!.progress.value)
-const currentTime = computed(() => isRdp ? guacPlayback.currentTime.value : ssh!.currentTime.value)
-const totalDuration = computed(() => isRdp ? guacPlayback.duration.value : ssh!.duration.value)
-const loadProgress = computed(() => isRdp ? guacPlayback.loadingProgress.value : 0)
+const showLoading = computed(() => isRdp ? converting.value : ssh!.loading.value)
+const showError = computed(() => isRdp ? (!!convertError.value && !mp4Url.value) : !!ssh!.error.value)
+const errorMsg = computed(() => isRdp ? convertError.value : ssh!.error.value)
+const paused = computed(() => isRdp ? true : ssh!.paused.value)
+const progress = computed(() => isRdp ? 0 : ssh!.progress.value)
+const currentTime = computed(() => isRdp ? 0 : ssh!.currentTime.value)
+const totalDuration = computed(() => isRdp ? 0 : ssh!.duration.value)
+const loadProgress = computed(() => isRdp ? convertPercent.value / 100 : 0)
 const loadLabel = computed(() => {
-  if (isRdp && converting.value) return '正在转换为MP4，请稍候...'
-  return isRdp ? guacPlayback.loadingLabel.value : ''
+  if (isRdp && converting.value) return stepLabels[convertStep.value] || '转换中...'
+  return ''
 })
-const showConvertError = computed(() => isRdp && convertError.value && !mp4Url.value)
-const isSeeking = computed(() => isRdp && guacPlayback.seeking.value)
-const seekProgressVal = computed(() => isRdp ? guacPlayback.seekProgress.value : 0)
+const isSeeking = computed(() => false)
+const seekProgressVal = computed(() => 0)
+
+// --- Video element for RDP MP4 ---
+let videoEl: HTMLVideoElement | null = null
 
 // --- SSH playback internals ---
 let terminal: Terminal | null = null
@@ -139,7 +142,7 @@ function fmtTooltip(val: number): string {
 
 function togglePlay() {
   if (isRdp) {
-    guacPlayback.togglePlay()
+    videoEl?.paused ? videoEl.play() : videoEl?.pause()
   } else if (ssh!.paused.value) {
     resumeSsh()
   } else {
@@ -149,17 +152,16 @@ function togglePlay() {
 
 function onSeek(pos: number) {
   if (isRdp) {
-    guacPlayback.seek(pos)
+    if (videoEl && videoEl.duration) {
+      videoEl.currentTime = (pos / 100) * videoEl.duration
+    }
   } else {
     seekSsh(pos)
   }
 }
 
 function onSetSpeed(speed: number) {
-  if (isRdp) {
-    guacPlayback.setSpeed(speed)
-    return
-  }
+  if (isRdp) return
   const currentPos = ssh!.currentTime.value
   sshSpeed.value = speed
   startTime = performance.now() - currentPos * 1000 / speed
@@ -183,32 +185,35 @@ function playMP4(url: string) {
   })
   playerContainer.value.innerHTML = ''
   playerContainer.value.appendChild(video)
+  videoEl = video
   mp4Url.value = url
 }
 
 function pollUntilConverted() {
   converting.value = true
   convertError.value = ''
-  const startTime = Date.now()
 
   pollTimer = setInterval(async () => {
-    if (Date.now() - startTime > CONVERT_POLL_TIMEOUT) {
-      stopPolling()
-      converting.value = false
-      convertError.value = '转换超时，请稍后重试'
-      return
-    }
     try {
-      const status = await getConvertStatus(key)
+      const status = await fetchConvertStatus(key)
       if (status.converted && status.mp4_url) {
         stopPolling()
         converting.value = false
         playMP4(status.mp4_url)
+        return
       }
+      if (status.error) {
+        stopPolling()
+        converting.value = false
+        convertError.value = status.error
+        return
+      }
+      if (status.step) convertStep.value = status.step
+      if (status.progress !== undefined) convertPercent.value = status.progress
     } catch {
       // ignore poll errors, keep retrying
     }
-  }, CONVERT_POLL_INTERVAL)
+  }, 3000)
 }
 
 function stopPolling() {
@@ -218,57 +223,51 @@ function stopPolling() {
   }
 }
 
-function fallbackToGuac() {
-  convertError.value = ''
-  mp4Url.value = ''
-  guacPlayback.load(getRecordFileGuacUrl(key), () => playerContainer.value ?? null)
-}
-
 function retry() {
   if (isRdp) {
-    guacPlayback.error.value = ''
-    guacPlayback.loading.value = true
-    guacPlayback.loadingProgress.value = 0
-    guacPlayback.loadingLabel.value = '正在加载录制文件...'
-    guacPlayback.load(fetchGuacRecordUrl(key), () => playerContainer.value ?? null).catch((e: any) => {
-      guacPlayback.error.value = e?.message || '加载录制失败'
-      guacPlayback.loading.value = false
-    })
+    convertError.value = ''
+    mp4Url.value = ''
+    initRdp()
+  } else {
+    // SSH retry
   }
 }
 
 // --- Keyboard ---
 function onKeydown(e: KeyboardEvent) {
-  if (!isRdp) return
+  if (isRdp) {
+    if (!videoEl) return
+    switch (e.code) {
+      case 'Space': e.preventDefault(); videoEl.paused ? videoEl.play() : videoEl.pause(); break
+      case 'ArrowLeft': e.preventDefault(); videoEl.currentTime = Math.max(0, videoEl.currentTime - 5); break
+      case 'ArrowRight': e.preventDefault(); videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime + 5); break
+      case 'KeyF': e.preventDefault(); toggleFullscreen(); break
+    }
+    return
+  }
   const seekDelta = 5 / totalDuration.value * 100
   switch (e.code) {
-    case 'Space': e.preventDefault(); guacPlayback.togglePlay(); break
-    case 'ArrowLeft': e.preventDefault(); guacPlayback.seek(Math.max(0, progress.value - seekDelta)); break
-    case 'ArrowRight': e.preventDefault(); guacPlayback.seek(Math.min(100, progress.value + seekDelta)); break
+    case 'Space': e.preventDefault(); togglePlay(); break
+    case 'ArrowLeft': e.preventDefault(); onSeek(Math.max(0, progress.value - seekDelta)); break
+    case 'ArrowRight': e.preventDefault(); onSeek(Math.min(100, progress.value + seekDelta)); break
     case 'KeyF': e.preventDefault(); toggleFullscreen(); break
   }
 }
 
-// --- Fullscreen ---
-function toggleFullscreen() {
-  document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()
-}
-
+// --- Fullscreen callback ---
 function onFullscreenChange() {
-  isFullscreen.value = !!document.fullscreenElement
-  const hide = isFullscreen.value ? 'none' : ''
   const toolbar = document.querySelector('.playback-toolbar') as HTMLElement
   const controls = document.querySelector('.playback-controls') as HTMLElement
   if (toolbar) toolbar.style.display = isFullscreen.value ? 'none' : 'flex'
-  if (controls) controls.style.display = hide || 'flex'
-  requestAnimationFrame(() => requestAnimationFrame(() => guacPlayback.fitDisplay()))
+  if (controls) controls.style.display = isFullscreen.value ? 'none' : 'flex'
+  requestAnimationFrame(() => requestAnimationFrame(() => fitAddon?.fit()))
 }
 
 // --- Resize ---
 let resizeTimer: ReturnType<typeof setTimeout> | null = null
 function onResize() {
   if (resizeTimer) clearTimeout(resizeTimer)
-  resizeTimer = setTimeout(() => { guacPlayback.fitDisplay(); fitAddon?.fit() }, 100)
+  resizeTimer = setTimeout(() => { fitAddon?.fit() }, 100)
 }
 
 // --- SSH functions ---
@@ -368,35 +367,29 @@ async function initSsh() {
 
 // --- Lifecycle ---
 async function initRdp() {
-  // Step 1: Check if MP4 already exists
-  try {
-    const status = await getConvertStatus(key)
-    if (status.converted && status.mp4_url) {
-      playMP4(status.mp4_url)
-      return
-    }
-  } catch {
-    // If status check fails, continue to size check
-  }
+  const status = await fetchConvertStatus(key)
 
-  // Step 2: Check .guac file size
-  try {
-    const sizeRes = await getRecordFileSize(key)
-    if (!sizeRes.should_convert) {
-      guacPlayback.load(getRecordFileGuacUrl(key), () => playerContainer.value ?? null)
-      return
-    }
-  } catch {
-    // If size check fails, fall back to direct .guac play
-    guacPlayback.load(getRecordFileGuacUrl(key), () => playerContainer.value ?? null)
+  if (status.error) {
+    convertError.value = status.error
     return
   }
 
-  // Step 3: Large file — trigger conversion and poll
+  if (status.converted && status.mp4_url) {
+    playMP4(status.mp4_url)
+    return
+  }
+
+  if (status.converting) {
+    convertStep.value = status.step || ''
+    convertPercent.value = status.progress || 0
+    pollUntilConverted()
+    return
+  }
+
   try {
-    await triggerConvert(key)
+    await fetchTriggerConvert(key)
   } catch {
-    // If trigger fails (e.g. already converting), that's fine — just poll
+    // If trigger fails, still try polling
   }
   pollUntilConverted()
 }
@@ -411,20 +404,19 @@ onMounted(async () => {
     }
   } catch (e: any) {
     const msg = e?.message || '加载录制失败'
-    isRdp ? (guacPlayback.error.value = msg, guacPlayback.loading.value = false) : (ssh!.error.value = msg, ssh!.loading.value = false)
+    isRdp ? (convertError.value = msg) : (ssh!.error.value = msg, ssh!.loading.value = false)
   }
   document.addEventListener('keydown', onKeydown)
-  document.addEventListener('fullscreenchange', onFullscreenChange)
   window.addEventListener('resize', onResize)
 })
 
 onBeforeUnmount(() => {
   clearTimers()
   stopPolling()
-  guacPlayback.destroy()
+  videoEl?.pause()
+  videoEl = null
   terminal?.dispose()
   document.removeEventListener('keydown', onKeydown)
-  document.removeEventListener('fullscreenchange', onFullscreenChange)
   window.removeEventListener('resize', onResize)
 })
 </script>

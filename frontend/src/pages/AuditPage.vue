@@ -1,12 +1,6 @@
 <template>
   <div class="audit-page">
-    <div class="top-nav">
-      <div class="nav-left">
-        <span class="nav-brand">GRemote</span>
-        <span class="nav-tag">控制台</span>
-      </div>
-      <span class="nav-link" @click="$router.push('/connect')">远程连接 →</span>
-    </div>
+    <TopNav link-text="远程连接 →" to="/connect" />
     <div class="audit-body">
       <div class="audit-card">
         <div class="audit-header">
@@ -87,9 +81,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { useAudit } from '../composables/useAudit'
-import { getConfig } from '../api'
+import { useDisplayMode } from '../composables/useDisplayMode'
+import TopNav from '../components/TopNav.vue'
 
 const { data, count, loading, fetch } = useAudit()
 
@@ -98,7 +93,14 @@ const search = ref('')
 const dateRange = ref<[string, string] | null>(null)
 const page = ref(1)
 const pageSize = ref(10)
-const displayMode = ref('all')
+const { displayMode } = useDisplayMode()
+
+watch(displayMode, (mode) => {
+  if (mode === 'windows') {
+    activeTab.value = 'windows'
+  }
+  fetchData()
+})
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -146,19 +148,6 @@ function onTabChange() {
 function onPlayback(key: string, protocol: string) {
   window.open(`/playback?key=${key}&protocol=${protocol}`, '_blank')
 }
-
-onMounted(async () => {
-  try {
-    const config = await getConfig()
-    displayMode.value = config.display_mode || 'all'
-    if (displayMode.value === 'windows') {
-      activeTab.value = 'windows'
-    }
-  } catch {
-    displayMode.value = 'all'
-  }
-  fetchData()
-})
 </script>
 
 <style scoped>
@@ -167,43 +156,6 @@ onMounted(async () => {
   flex-direction: column;
   min-height: 100vh;
   background: #f0f2f5;
-}
-
-.top-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 44px;
-  padding: 0 20px;
-  background: #fff;
-  border-bottom: 1px solid #e8e8e8;
-  flex-shrink: 0;
-}
-
-.nav-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.nav-brand {
-  font-weight: 700;
-  font-size: 15px;
-  color: #006eff;
-}
-
-.nav-tag {
-  font-size: 11px;
-  color: #909399;
-  background: #f0f2f5;
-  padding: 1px 6px;
-  border-radius: 2px;
-}
-
-.nav-link {
-  font-size: 13px;
-  color: #006eff;
-  cursor: pointer;
 }
 
 .audit-body {

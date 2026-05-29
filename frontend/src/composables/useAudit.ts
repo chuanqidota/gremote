@@ -1,5 +1,6 @@
 import { ref } from 'vue'
-import { queryAudit, getRecordUrl, getRecordFileGuacUrl, getConvertStatus, triggerConvert, getRecordFileMP4Url, getRecordFileSize } from '../api'
+import { queryAudit, getRecordUrl, getRecordFileGuacUrl, getConvertStatus, triggerConvert, getRecordFileMP4Url } from '../api'
+import { extractErrorMessage } from '../utils/error'
 import type { AuditRecord, AuditQuery } from '../types'
 
 export function useAudit() {
@@ -16,7 +17,7 @@ export function useAudit() {
       data.value = res.result ?? []
       count.value = res.count ?? 0
     } catch (e: any) {
-      error.value = e?.response?.data?.msg || e?.message || 'Failed to fetch audit records'
+      error.value = extractErrorMessage(e, 'Failed to fetch audit records')
     } finally {
       loading.value = false
     }
@@ -30,5 +31,17 @@ export function useAudit() {
     return getRecordFileGuacUrl(key)
   }
 
-  return { data, count, loading, error, fetch, fetchRecordUrl, fetchGuacRecordUrl, getConvertStatus, triggerConvert, getRecordFileMP4Url, getRecordFileSize, getRecordFileGuacUrl }
+  function fetchConvertStatus(key: string) {
+    return getConvertStatus(key)
+  }
+
+  function fetchTriggerConvert(key: string) {
+    return triggerConvert(key)
+  }
+
+  function fetchRecordFileMP4Url(key: string): string {
+    return getRecordFileMP4Url(key)
+  }
+
+  return { data, count, loading, error, fetch, fetchRecordUrl, fetchGuacRecordUrl, fetchConvertStatus, fetchTriggerConvert, fetchRecordFileMP4Url }
 }

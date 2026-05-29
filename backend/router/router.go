@@ -28,7 +28,6 @@ func Engine() *gin.Engine {
 		api.POST("convert-guac", apihandler.ApiHandle.ConvertGuac)       // 触发 .guac 转 MP4 异步任务
 		api.GET("convert-status", apihandler.ApiHandle.ConvertStatus)    // 查询 MP4 转换状态
 		api.GET("record-file-mp4", apihandler.ApiHandle.RecordFileMP4)   // 获取转换后的 MP4 录制文件
-		api.GET("record-file-size", apihandler.ApiHandle.RecordFileSize) // 获取.guac文件大小及是否需要转换
 		api.GET("config", apihandler.ApiHandle.GetConfig)                // 获取前端显示配置(display_mode)
 	}
 

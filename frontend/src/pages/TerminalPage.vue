@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Terminal } from 'xterm'
@@ -50,6 +50,8 @@ import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useFileManager } from '../composables/useFileManager'
+import { useFullscreen } from '../composables/useFullscreen'
+import { useConnectionStatus } from '../composables/useConnectionStatus'
 import { FullScreen, Close } from '@element-plus/icons-vue'
 import FileListDialog from '../components/FileListDialog.vue'
 import FileUploadDialog from '../components/FileUploadDialog.vue'
@@ -105,28 +107,11 @@ const currentTheme = ref('dark')
 
 const { status, error, connect, getSocket } = useWebSocket(key)
 const fileManager = useFileManager(key)
+const { isFullscreen, toggleFullscreen } = useFullscreen()
+const { statusColor, statusText } = useConnectionStatus(status, error, { connecting: '' })
 
 let term: Terminal | null = null
 let fitAddon: FitAddon | null = null
-
-const statusColor = computed(() => {
-  switch (status.value) {
-    case 'connected': return '#67c23a'
-    case 'connecting': return '#e6a23c'
-    case 'error': return '#f56c6c'
-    default: return '#909399'
-  }
-})
-
-const statusText = computed(() => {
-  switch (status.value) {
-    case 'connecting': return ''
-    case 'connected': return '已连接'
-    case 'disconnected': return '已断开'
-    case 'error': return error.value || '错误'
-    default: return ''
-  }
-})
 
 const pageStyle = computed(() => ({
   '--bg-page': themes[currentTheme.value].page,
@@ -137,27 +122,11 @@ const toolbarStyle = computed(() => ({
   borderColor: themes[currentTheme.value].border,
 }))
 
-const isFullscreen = ref(false)
-
-function onFullscreenChange() {
-  isFullscreen.value = !!document.fullscreenElement
-}
-
-function toggleFullscreen() {
-  if (document.fullscreenElement) {
-    document.exitFullscreen()
-  } else {
-    document.documentElement.requestFullscreen()
-  }
-}
-
 onMounted(() => {
   if (!key) {
     ElMessage.error('缺少连接密钥')
     return
   }
-
-  document.addEventListener('fullscreenchange', onFullscreenChange)
 
   const socket = connect(wsHost)
 
@@ -187,7 +156,6 @@ function initTerminal(socket: WebSocket) {
   fitAddon.fit()
   term.focus()
 
-  // 手动处理 WebSocket 双向通信（替代 AttachAddon）
   term.onData((data) => {
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(data)

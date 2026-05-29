@@ -16,10 +16,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { FullScreen, Close } from '@element-plus/icons-vue'
+import { useFullscreen } from '../composables/useFullscreen'
+import { useConnectionStatus } from '../composables/useConnectionStatus'
 import Guacamole from 'guacamole-common-js'
 
 const route = useRoute()
@@ -27,29 +29,12 @@ const key = route.query.key as string
 const hostIp = route.query.host as string
 
 const displayContainer = ref<HTMLDivElement>()
-const isFullscreen = ref(false)
 
 const status = ref<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting')
 const error = ref('')
 
-const statusColor = computed(() => {
-  switch (status.value) {
-    case 'connected': return '#67c23a'
-    case 'connecting': return '#e6a23c'
-    case 'error': return '#f56c6c'
-    default: return '#909399'
-  }
-})
-
-const statusText = computed(() => {
-  switch (status.value) {
-    case 'connecting': return '连接中...'
-    case 'connected': return '已连接'
-    case 'disconnected': return '已断开'
-    case 'error': return error.value || '错误'
-    default: return ''
-  }
-})
+const { statusColor, statusText } = useConnectionStatus(status, error)
+const { isFullscreen, toggleFullscreen } = useFullscreen(onFullscreenChange)
 
 let guacClient: any = null
 let tunnel: Guacamole.WebSocketTunnel | null = null
@@ -67,7 +52,6 @@ function updateContainerSize() {
   displayContainer.value.style.height = (window.innerHeight - toolbarH) + 'px'
 }
 
-// Scale Guacamole display to fill the container using CSS transform
 function fitDisplay() {
   if (!guacClient || !displayContainer.value) return
   const display = guacClient.getDisplay()
@@ -82,22 +66,17 @@ function fitDisplay() {
 }
 
 function onFullscreenChange() {
-  isFullscreen.value = !!document.fullscreenElement
-  // Hide toolbar in fullscreen so remote desktop gets full screen area
   const toolbarEl = document.querySelector('.rdp-toolbar') as HTMLElement
   if (toolbarEl) {
     toolbarEl.style.display = isFullscreen.value ? 'none' : 'flex'
   }
-  // Use requestAnimationFrame to wait for browser to finish fullscreen animation
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       updateContainerSize()
       fitDisplay()
-      // Resize RDP session to match the new viewport so the display fills the screen.
       if (guacClient && status.value === 'connected') {
         guacClient.sendSize(window.innerWidth, window.innerHeight)
       }
-      // Retry fitDisplay after sendSize takes effect (guacd is async)
       setTimeout(() => {
         updateContainerSize()
         fitDisplay()
@@ -106,23 +85,12 @@ function onFullscreenChange() {
   })
 }
 
-function toggleFullscreen() {
-  if (document.fullscreenElement) {
-    document.exitFullscreen()
-  } else {
-    document.documentElement.requestFullscreen()
-  }
-}
-
 onMounted(() => {
   if (!key) {
     ElMessage.error('缺少连接密钥')
     return
   }
 
-  document.addEventListener('fullscreenchange', onFullscreenChange)
-
-  // Force page layout via JavaScript (scoped CSS may not apply to dynamic elements)
   const pageEl = document.querySelector('.rdp-page') as HTMLElement
   if (pageEl) {
     pageEl.style.position = 'relative'
@@ -130,24 +98,18 @@ onMounted(() => {
     pageEl.style.overflow = 'hidden'
   }
 
-  // Build WebSocket URL with viewport dimensions (excluding toolbar)
   const backendHost = import.meta.env.VITE_API_HOST || 'localhost:8000'
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   const toolbarH = getToolbarHeight()
   const wsUrl = `${protocol}//${backendHost}/ws/v1/rdp/${key}?width=${window.innerWidth}&height=${window.innerHeight - toolbarH}`
 
-  // Create Guacamole tunnel, client, and display
   tunnel = new Guacamole.WebSocketTunnel(wsUrl)
   guacClient = new Guacamole.Client(tunnel)
 
-  // Attach display element to DOM
   const displayEl = guacClient.getDisplay().getElement()
   displayContainer.value!.appendChild(displayEl)
-
-  // Hide system cursor (guacamole renders its own remote cursor)
   displayEl.style.cursor = 'none'
 
-  // Force container to fill viewport below toolbar (CSS scoped rules may not apply)
   const container = displayContainer.value!
   container.style.position = 'fixed'
   container.style.left = '0'
@@ -157,13 +119,11 @@ onMounted(() => {
 
   const guacDisplay = guacClient.getDisplay()
 
-  // Mouse input — applyDisplayScale=true corrects coordinates for CSS transform scaling
   const mouse = new Guacamole.Mouse(displayEl)
   mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = (mouseState: any) => {
     guacClient.sendMouseState(mouseState, true)
   }
 
-  // Keyboard input
   const keyboard = new Guacamole.Keyboard(document)
   keyboard.onkeydown = (keysym: number) => {
     guacClient.sendKeyEvent(1, keysym)
@@ -172,8 +132,6 @@ onMounted(() => {
     guacClient.sendKeyEvent(0, keysym)
   }
 
-  // Tunnel event handlers (set before connect so Client.connect()
-  // can wrap them without interference from our logging)
   tunnel.onerror = (errorMsg: any) => {
     console.error('[RDP] Tunnel error:', errorMsg)
     status.value = 'error'
@@ -195,15 +153,12 @@ onMounted(() => {
     }
   }
 
-  // Connect — Client.connect() sets up its own oninstruction handler
   guacClient.connect('')
 
-  // Re-fit display when guacd resizes it
   guacDisplay.onresize = () => {
     fitDisplay()
   }
 
-  // 首次同步时缩放显示以适配容器
   let synced = false
   guacClient.onsync = () => {
     if (!synced) {
@@ -212,8 +167,6 @@ onMounted(() => {
     }
   }
 
-  // Handle resize — update container size, fit display, and remote resolution
-  // Debounce the entire handler to prevent resize spirals (fitDisplay → scale change → resize → ...)
   let resizeTimer: ReturnType<typeof setTimeout> | null = null
   window.addEventListener('resize', () => {
     if (resizeTimer) clearTimeout(resizeTimer)
@@ -221,7 +174,6 @@ onMounted(() => {
       if (displayContainer.value && guacClient) {
         updateContainerSize()
         fitDisplay()
-        // Only sendSize in non-fullscreen mode; fullscreen uses CSS scaling
         if (!isFullscreen.value && guacClient && status.value === 'connected') {
           const toolbarH = getToolbarHeight()
           guacClient.sendSize(window.innerWidth, window.innerHeight - toolbarH)
@@ -232,7 +184,6 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener('fullscreenchange', onFullscreenChange)
   tunnel?.disconnect()
   guacClient = null
   tunnel = null

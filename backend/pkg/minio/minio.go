@@ -98,16 +98,3 @@ func ListFiles(prefix string) ([]string, error) {
 	}
 	return files, nil
 }
-
-// GetFileSize 获取S3文件大小（字节），不下载文件内容
-func GetFileSize(key string) (int64, error) {
-	if S3Client == nil {
-		return 0, fmt.Errorf("S3客户端未初始化")
-	}
-	bucketName := config.Conf.S3.Bucket
-	info, err := S3Client.StatObject(context.Background(), bucketName, key, minio.StatObjectOptions{})
-	if err != nil {
-		return 0, fmt.Errorf("获取S3文件信息失败-%s", err.Error())
-	}
-	return info.Size, nil
-}

@@ -182,7 +182,7 @@ func (a *apiHandle) RecordUrl(c *gin.Context) {
 	response.Success(c, "执行成功", url)
 }
 
-// RecordFile 获取录制文件内容
+// RecordFile 获取SSH录制文件内容（asciinema格式）
 func (a *apiHandle) RecordFile(c *gin.Context) {
 	key := c.Query("key")
 	if key == "" {
@@ -194,7 +194,6 @@ func (a *apiHandle) RecordFile(c *gin.Context) {
 		response.Fail(c, fmt.Sprintf("读取录制文件失败-%s", err.Error()))
 		return
 	}
-	c.Header("Content-Type", "text/plain; charset=utf-8")
 	c.Data(200, "text/plain; charset=utf-8", data)
 }
 
@@ -215,7 +214,7 @@ func (a *apiHandle) RecordFileGuac(c *gin.Context) {
 	c.Data(200, "application/octet-stream", data)
 }
 
-// ListGuacFiles 列出S3中所有.guac录制文件（调试用）
+// ListGuacFiles 列出S3中所有.guac录制文件
 func (a *apiHandle) ListGuacFiles(c *gin.Context) {
 	files, err := minio.ListFiles("")
 	if err != nil {
@@ -224,36 +223,16 @@ func (a *apiHandle) ListGuacFiles(c *gin.Context) {
 	}
 	var guacFiles []string
 	for _, f := range files {
-		if len(f) > 5 && f[len(f)-5:] == ".guac" {
+		if strings.HasSuffix(f, ".guac") {
 			guacFiles = append(guacFiles, f)
 		}
 	}
 	response.Success(c, "执行成功", guacFiles)
 }
 
-// GetConfig 获取前端显示配置
+// GetConfig 获取前端显示配置（display_mode: all | linux | windows）
 func (a *apiHandle) GetConfig(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"display_mode": config.Conf.Display.DisplayMode,
-	})
-}
-
-// RecordFileSize 获取.guac录制文件大小，返回是否需要转换
-func (a *apiHandle) RecordFileSize(c *gin.Context) {
-	key := c.Query("key")
-	if key == "" {
-		response.Fail(c, "参数错误")
-		return
-	}
-	guacKey := fmt.Sprintf("%s.guac", key)
-	size, err := minio.GetFileSize(guacKey)
-	if err != nil {
-		response.Fail(c, fmt.Sprintf("获取录制文件大小失败-%s", err.Error()))
-		return
-	}
-	threshold := config.Conf.Guacd.GuacSizeThreshold
 	response.Success(c, "执行成功", gin.H{
-		"size":          size,
-		"should_convert": size >= threshold,
+		"display_mode": config.Conf.Display.DisplayMode,
 	})
 }

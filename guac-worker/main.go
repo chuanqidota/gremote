@@ -67,6 +67,7 @@ func main() {
 
 	// /convert 接收 .guac 转 MP4 的转换请求，/health 用于健康检查
 	r.POST("/convert", handleConvert)
+	r.GET("/progress", handleProgress)
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
