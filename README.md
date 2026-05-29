@@ -212,6 +212,7 @@ Guacd:
   DefaultHeight: 768            # RDP 默认窗口高度
   DefaultDPI: 96               # RDP 默认 DPI
   SessionTimeout: 86400         # guacd 会话超时（秒），默认24小时
+  GuacSizeThreshold: 52428800   # 触发自动转MP4的.guac文件大小阈值（字节），默认50MB
 
 GuacWorker:
   URL: http://127.0.0.1:8081   # guac 录像转换服务地址
@@ -387,6 +388,12 @@ print(f'打开远程桌面: http://your-host/rdp?key={key}&host=192.168.1.100')
 | GET | `/login-audit` | 查询登录审计 | Query: `offset, limit, search, startTime, endTime` |
 | GET | `/record-url` | 获取回放地址 | Query: `key` |
 | GET | `/record-file` | 获取录制文件 | Query: `key` |
+| GET | `/record-file-guac` | 获取 RDP 录制文件内容(.guac) | Query: `key` |
+| GET | `/record-file-size` | 获取 .guac 文件大小及是否需要转换 | Query: `key` |
+| GET | `/list-guac-files` | 列出 S3 中所有 .guac 录制文件 | — |
+| POST | `/convert-guac` | 触发 .guac 转 MP4 异步任务 | Query: `key` |
+| GET | `/convert-status` | 查询 MP4 转换状态 | Query: `key` |
+| GET | `/record-file-mp4` | 获取转换后的 MP4 录制文件 | Query: `key` |
 
 ### WebSocket
 
@@ -478,6 +485,9 @@ gremote/
 
 **Q: RDP 录像文件在哪里？**
 RDP 会话录像以 `.guac` 格式存储在 MinIO 中，文件名为 `{session-key}.guac`。
+
+**Q: RDP 录像回放时为什么会自动转换为 MP4？**
+当 `.guac` 录像文件大小超过 `Guacd.GuacSizeThreshold`（默认 50MB）时，前端会自动触发异步转换任务将 `.guac` 转为 MP4 格式播放，以获得更好的回放体验。转换过程通过轮询 `/convert-status` 接口跟踪进度，转换完成后自动播放 MP4。若转换失败或超时，可选择使用原始 `.guac` 格式播放。阈值可在配置文件中调整。
 
 **Q: guacd 容器启动失败？**
 1. 检查端口 4822 是否被占用：`lsof -i :4822`

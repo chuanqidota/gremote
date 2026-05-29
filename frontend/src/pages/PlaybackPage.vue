@@ -24,6 +24,14 @@
       </div>
     </div>
 
+    <div v-else-if="showConvertError" class="error">
+      <p>{{ convertError }}</p>
+      <div class="error-actions">
+        <el-button @click="fallbackToGuac">使用原始格式播放</el-button>
+        <el-button @click="$router.back()">返回</el-button>
+      </div>
+    </div>
+
     <template v-else>
       <div ref="playerContainer" class="player-container" />
       <div v-if="isSeeking" class="seek-overlay">
@@ -67,10 +75,16 @@ const key = route.query.key as string
 const protocol = (route.query.protocol as string) || 'ssh'
 const isRdp = protocol === 'rdp'
 
-const { fetchRecordUrl, fetchGuacRecordUrl } = useAudit()
+const { fetchRecordUrl, fetchGuacRecordUrl, getConvertStatus, triggerConvert, getRecordFileSize, getRecordFileGuacUrl } = useAudit()
 const guacPlayback = useGuacPlayback()
 const playerContainer = ref<HTMLDivElement>()
 const isFullscreen = ref(false)
+const mp4Url = ref('')
+const converting = ref(false)
+const convertError = ref('')
+let pollTimer: ReturnType<typeof setInterval> | null = null
+const CONVERT_POLL_INTERVAL = 3000
+const CONVERT_POLL_TIMEOUT = 10 * 60 * 1000 // 10 minutes
 
 // --- Unified state (RDP uses guacPlayback, SSH uses local refs) ---
 const ssh = isRdp ? null : {
@@ -85,7 +99,7 @@ const ssh = isRdp ? null : {
 const sshSpeed = ref(1)
 const playbackSpeed = computed(() => isRdp ? guacPlayback.playbackSpeed.value : sshSpeed.value)
 
-const showLoading = computed(() => isRdp ? guacPlayback.loading.value : ssh!.loading.value)
+const showLoading = computed(() => isRdp ? (guacPlayback.loading.value || converting.value) : ssh!.loading.value)
 const showError = computed(() => isRdp ? guacPlayback.error.value : ssh!.error.value)
 const errorMsg = computed(() => isRdp ? guacPlayback.error.value : ssh!.error.value)
 const paused = computed(() => isRdp ? guacPlayback.paused.value : ssh!.paused.value)
@@ -93,7 +107,11 @@ const progress = computed(() => isRdp ? guacPlayback.progress.value : ssh!.progr
 const currentTime = computed(() => isRdp ? guacPlayback.currentTime.value : ssh!.currentTime.value)
 const totalDuration = computed(() => isRdp ? guacPlayback.duration.value : ssh!.duration.value)
 const loadProgress = computed(() => isRdp ? guacPlayback.loadingProgress.value : 0)
-const loadLabel = computed(() => isRdp ? guacPlayback.loadingLabel.value : '')
+const loadLabel = computed(() => {
+  if (isRdp && converting.value) return '正在转换为MP4，请稍候...'
+  return isRdp ? guacPlayback.loadingLabel.value : ''
+})
+const showConvertError = computed(() => isRdp && convertError.value && !mp4Url.value)
 const isSeeking = computed(() => isRdp && guacPlayback.seeking.value)
 const seekProgressVal = computed(() => isRdp ? guacPlayback.seekProgress.value : 0)
 
@@ -151,13 +169,68 @@ function onSetSpeed(speed: number) {
   }
 }
 
+function playMP4(url: string) {
+  if (!playerContainer.value) return
+  const video = document.createElement('video')
+  video.controls = true
+  video.autoplay = true
+  video.style.maxWidth = '100%'
+  video.style.maxHeight = '100%'
+  video.src = url
+  video.addEventListener('error', () => {
+    convertError.value = 'MP4播放失败'
+    mp4Url.value = ''
+  })
+  playerContainer.value.innerHTML = ''
+  playerContainer.value.appendChild(video)
+  mp4Url.value = url
+}
+
+function pollUntilConverted() {
+  converting.value = true
+  convertError.value = ''
+  const startTime = Date.now()
+
+  pollTimer = setInterval(async () => {
+    if (Date.now() - startTime > CONVERT_POLL_TIMEOUT) {
+      stopPolling()
+      converting.value = false
+      convertError.value = '转换超时，请稍后重试'
+      return
+    }
+    try {
+      const status = await getConvertStatus(key)
+      if (status.converted && status.mp4_url) {
+        stopPolling()
+        converting.value = false
+        playMP4(status.mp4_url)
+      }
+    } catch {
+      // ignore poll errors, keep retrying
+    }
+  }, CONVERT_POLL_INTERVAL)
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+function fallbackToGuac() {
+  convertError.value = ''
+  mp4Url.value = ''
+  guacPlayback.load(getRecordFileGuacUrl(key), () => playerContainer.value ?? null)
+}
+
 function retry() {
   if (isRdp) {
     guacPlayback.error.value = ''
     guacPlayback.loading.value = true
     guacPlayback.loadingProgress.value = 0
     guacPlayback.loadingLabel.value = '正在加载录制文件...'
-    guacPlayback.load(fetchGuacRecordUrl(key), () => playerContainer.value).catch((e: any) => {
+    guacPlayback.load(fetchGuacRecordUrl(key), () => playerContainer.value ?? null).catch((e: any) => {
       guacPlayback.error.value = e?.message || '加载录制失败'
       guacPlayback.loading.value = false
     })
@@ -294,10 +367,48 @@ async function initSsh() {
 }
 
 // --- Lifecycle ---
+async function initRdp() {
+  // Step 1: Check if MP4 already exists
+  try {
+    const status = await getConvertStatus(key)
+    if (status.converted && status.mp4_url) {
+      playMP4(status.mp4_url)
+      return
+    }
+  } catch {
+    // If status check fails, continue to size check
+  }
+
+  // Step 2: Check .guac file size
+  try {
+    const sizeRes = await getRecordFileSize(key)
+    if (!sizeRes.should_convert) {
+      guacPlayback.load(getRecordFileGuacUrl(key), () => playerContainer.value ?? null)
+      return
+    }
+  } catch {
+    // If size check fails, fall back to direct .guac play
+    guacPlayback.load(getRecordFileGuacUrl(key), () => playerContainer.value ?? null)
+    return
+  }
+
+  // Step 3: Large file — trigger conversion and poll
+  try {
+    await triggerConvert(key)
+  } catch {
+    // If trigger fails (e.g. already converting), that's fine — just poll
+  }
+  pollUntilConverted()
+}
+
 onMounted(async () => {
   if (!key) { if (!isRdp) { ssh!.error.value = '缺少 key 参数'; ssh!.loading.value = false }; return }
   try {
-    isRdp ? await guacPlayback.load(fetchGuacRecordUrl(key), () => playerContainer.value) : await initSsh()
+    if (isRdp) {
+      await initRdp()
+    } else {
+      await initSsh()
+    }
   } catch (e: any) {
     const msg = e?.message || '加载录制失败'
     isRdp ? (guacPlayback.error.value = msg, guacPlayback.loading.value = false) : (ssh!.error.value = msg, ssh!.loading.value = false)
@@ -309,6 +420,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   clearTimers()
+  stopPolling()
   guacPlayback.destroy()
   terminal?.dispose()
   document.removeEventListener('keydown', onKeydown)
