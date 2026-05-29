@@ -463,6 +463,64 @@ gremote/
 
 ---
 
+## RDP 录像回放流程
+
+RDP 会话录像以 `.guac` 格式存储在 MinIO 中，key 为 `<session-key>.guac`。回放时前端按以下流程自动选择播放方式：
+
+```
+用户打开回放页面
+       │
+       ▼
+  ① MP4 已存在？ ──── 是 ──→ 直接播放 MP4（HTML5 <video>）
+       │ 否
+       ▼
+  ② .guac 文件 < 50MB？ ── 是 ──→ 原生播放 .guac（guacamole-common-js）
+       │ 否
+       ▼
+  ③ 触发异步转换 → 轮询等待（每3秒，最长10分钟）→ 播放 MP4
+       │
+     转换失败/超时？
+       │
+       ▼
+  ④ 用户可选择"使用原始格式播放"回退到 .guac
+```
+
+### 原生播放（.guac）
+
+基于 guacamole-common-js 的 `SessionRecording`，支持播放、暂停、跳转和倍速（0.5x / 1x / 2x / 4x / 8x）。适合小文件，无需转换等待。
+
+### MP4 播放
+
+基于 HTML5 `<video>` 标签，使用浏览器原生播放控件。适合大文件，由 guac-worker 异步转换生成。
+
+### guac-worker 转换服务
+
+guac-worker 是独立的 Go HTTP 服务，负责将 `.guac` 录像转换为浏览器兼容的 MP4。
+
+**转换流程：** `.guac` → guacenc → `.m4v` → ffmpeg (H.264) → `.mp4` → 上传 S3
+
+**转换 API：**
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/convert` | 接收转换请求，Body: `{"key": "<key>"}` |
+| GET | `/health` | 健康检查 |
+
+**相关配置：**
+
+```yaml
+GuacWorker:
+  URL: http://127.0.0.1:8081   # guac-worker 服务地址
+  Timeout: 300                  # HTTP 客户端超时（秒）
+
+# guac-worker 自身配置（guac-worker/config.yaml）
+convert_timeout: 600            # 每个转换步骤超时（秒），默认10分钟
+```
+
+> guac-worker 默认监听 8080 端口，docker-compose 中映射为宿主机 8081 端口。转换依赖 guacenc 和 ffmpeg 工具，已内置在 guac-worker 镜像中。
+
+---
+
 ## 常见问题
 
 **Q: 密钥过期后无法连接？**
