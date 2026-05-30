@@ -16,25 +16,29 @@
 
 ## 页面展示
 
-### SSH 连接
+### SSH / RDP 连接
 
-![Linux 连接](docs/image/01_linux连接.png)
+| Linux | Windows |
+|-------|---------|
+| ![Linux 连接](docs/image/01_linux连接.png) | ![Windows 连接](docs/image/02_windows连接.png) |
 
-### RDP 连接
+### 远程桌面
 
-![Windows 连接](docs/image/02_windows连接.png)
+| Linux | Windows |
+|-------|---------|
+| ![Linux 远程](docs/image/03_linux远程.png) | ![Windows 远程](docs/image/04_windows远程.png) |
 
 ### 回放列表
 
 | Linux | Windows |
 |-------|---------|
-| ![Linux 回放列表](docs/image/03_linux回放列表.png) | ![Windows 连接列表](docs/image/04_windows连接列表.png) |
+| ![Linux 回放列表](docs/image/05_linux回放列表.png) | ![Windows 连接列表](docs/image/06_windows连接列表.png) |
 
 ### 录像回放
 
 | Linux | Windows |
 |-------|---------|
-| ![Linux 录像回放](docs/image/05_linux录像回放.png) | ![Windows 录像回放](docs/image/06_windows录像回放.png) |
+| ![Linux 录像回放](docs/image/07_linux录像回放.png) | ![Windows 录像回放](docs/image/08_windows录像回放.png) |
 
 ---
 
