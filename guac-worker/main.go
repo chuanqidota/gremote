@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"time"
 
@@ -39,6 +40,13 @@ func InitConfig() {
 	viper.AddConfigPath(".")
 	viper.AutomaticEnv()
 
+	// Bind environment variables to config keys
+	viper.BindEnv("s3.endpoint", "S3_ENDPOINT")
+	viper.BindEnv("s3.access_key", "S3_ACCESS_KEY")
+	viper.BindEnv("s3.secret_key", "S3_SECRET_KEY")
+	viper.BindEnv("s3.bucket", "S3_BUCKET")
+	viper.BindEnv("s3.use_ssl", "S3_USE_SSL")
+
 	if err := viper.ReadInConfig(); err != nil {
 		log.Printf("Warning: config file not found, using defaults: %v", err)
 	}
@@ -58,6 +66,18 @@ func InitConfig() {
 		log.Fatalf("Failed to init S3 client: %v", err)
 	}
 	s3Client = client
+
+	// Auto-create bucket if not exists
+	exists, err := client.BucketExists(context.Background(), cfg.S3.Bucket)
+	if err != nil {
+		log.Printf("Warning: failed to check bucket: %v", err)
+	} else if !exists {
+		if err := client.MakeBucket(context.Background(), cfg.S3.Bucket, minio.MakeBucketOptions{}); err != nil {
+			log.Printf("Warning: failed to create bucket: %v", err)
+		} else {
+			log.Printf("Created bucket: %s", cfg.S3.Bucket)
+		}
+	}
 }
 
 func main() {

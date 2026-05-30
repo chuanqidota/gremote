@@ -31,6 +31,14 @@ services:
     restart: unless-stopped
     ports:
       - "8081:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - S3_ENDPOINT=host.docker.internal:9000
+      - S3_ACCESS_KEY=${MINIO_ROOT_USER}
+      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - S3_BUCKET=gremote
+      - S3_USE_SSL=false
     volumes:
       - /tmp/recordings:/recordings
       - ./guac-worker/config.yaml:/app/config.yaml

@@ -103,6 +103,15 @@ func doConvert(key string) {
 	// Step 1: Download .guac from S3
 	setProgress(key, "downloading", 5)
 	guacKey := fmt.Sprintf("%s.guac", key)
+
+	// Check if object exists first
+	info, err := s3Client.StatObject(context.Background(), cfg.S3.Bucket, guacKey, minio.StatObjectOptions{})
+	if err != nil {
+		setError(key, fmt.Sprintf(".guac file not found in S3 (bucket=%s, key=%s, endpoint=%s): %v", cfg.S3.Bucket, guacKey, cfg.S3.Endpoint, err))
+		return
+	}
+	log.Printf("Found .guac file: key=%s size=%d", guacKey, info.Size)
+
 	obj, err := s3Client.GetObject(context.Background(), cfg.S3.Bucket, guacKey, minio.GetObjectOptions{})
 	if err != nil {
 		setError(key, fmt.Sprintf("failed to get .guac from s3: %v", err))

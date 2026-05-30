@@ -176,8 +176,9 @@ function playMP4(url: string) {
   const video = document.createElement('video')
   video.controls = true
   video.autoplay = true
-  video.style.maxWidth = '100%'
-  video.style.maxHeight = '100%'
+  video.style.width = '100%'
+  video.style.height = '100%'
+  video.style.objectFit = 'cover'
   video.src = url
   video.addEventListener('error', () => {
     convertError.value = 'MP4播放失败'
@@ -199,6 +200,7 @@ function pollUntilConverted() {
       if (status.converted && status.mp4_url) {
         stopPolling()
         converting.value = false
+        await nextTick()
         playMP4(status.mp4_url)
         return
       }
@@ -388,8 +390,10 @@ async function initRdp() {
 
   try {
     await fetchTriggerConvert(key)
-  } catch {
-    // If trigger fails, still try polling
+  } catch (e: any) {
+    const msg = e?.response?.data?.msg || e?.message || '转换启动失败'
+    convertError.value = msg
+    return
   }
   pollUntilConverted()
 }
@@ -430,7 +434,8 @@ onBeforeUnmount(() => {
 .toolbar-right { display: flex; gap: 6px; margin-left: auto; align-items: center }
 .loading, .error { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 12px; color: #ccc; font-size: 16px }
 .error-actions { display: flex; gap: 8px }
-.player-container { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden }
+.player-container { flex: 1; min-height: 0; position: relative; overflow: hidden }
+.player-container :deep(video) { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover }
 .seek-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); background: rgba(0,0,0,0.7); color: #fff; padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 10; pointer-events: none }
 .playback-controls { display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: #2d2d2d; border-top: 1px solid #3d3d3d; flex-shrink: 0 }
 .time-display { font-size: 12px; color: #909399; font-variant-numeric: tabular-nums; white-space: nowrap }

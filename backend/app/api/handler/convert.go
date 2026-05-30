@@ -81,6 +81,14 @@ func (a *apiHandle) ConvertGuac(c *gin.Context) {
 		return
 	}
 
+	// Check if .guac source file exists in S3
+	guacKey := fmt.Sprintf("%s.guac", key)
+	if _, err := minio.GetFile(guacKey); err != nil {
+		converting.Delete(key)
+		response.Fail(c, "录制文件不存在，无法转换")
+		return
+	}
+
 	// Start async conversion
 	go doConvert(key)
 	response.Success(c, "转换已启动", nil)
